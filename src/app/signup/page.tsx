@@ -4,7 +4,10 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+} from "firebase/auth";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -13,6 +16,7 @@ export default function SignUp() {
     password: "",
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -21,12 +25,17 @@ export default function SignUp() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      await createUserWithEmailAndPassword(
+      const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
-      alert("Account created successfully!");
+
+      // Send verification email
+      await sendEmailVerification(userCredential.user);
+      setSuccess(
+        "Account created successfully! A verification email has been sent to your email address. Please verify it to log in."
+      );
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -99,6 +108,9 @@ export default function SignUp() {
             Sign Up
           </Button>
         </form>
+        {success && (
+          <p className="text-green-500 mt-4 text-center">{success}</p>
+        )}
         {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
         <div className="mt-6 text-center text-sm text-purple-300">
           Already have an account?{" "}
