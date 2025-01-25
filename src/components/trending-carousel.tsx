@@ -97,7 +97,12 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
                     </span>
                   </div>
                 </div>
-                <Button className="w-full bg-purple-600 hover:bg-purple-700">Place Bid</Button>
+                <Button 
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  asChild
+                >
+                  <a href="/placebid">Place Bid</a>
+                </Button>
               </div>
             </Card>
           </div>
