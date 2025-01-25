@@ -95,7 +95,7 @@ const trendingItems = [
     image: "/jersey.jpg",
     bids: 34,
     watchers: 289,
-  }
+  },
 ];
 
 // Expanded mock data for auction listings
@@ -210,35 +210,36 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* Category Filters */}
-        <div className="flex items-center space-x-4 mb-6 overflow-x-auto pb-2">
-          <Button variant="default" size="sm" className="bg-purple-600 hover:bg-purple-700">
-            All Items
+      {/* Category Filters */}
+      <div className="flex items-center space-x-4 mb-6 overflow-x-auto pb-2">
+        <Button variant="default" size="sm" className="bg-purple-600 hover:bg-purple-700">
+          All Items
+        </Button>
+        {["Art", "Collectibles", "Electronics", "Fashion", "Jewelry", "Sports"].map((category) => (
+          <Button 
+            key={category} 
+            variant="outline" 
+            size="sm"
+            className="border-purple-700 hover:bg-purple-900/50"
+          >
+            {category}
           </Button>
-          {["Art", "Collectibles", "Electronics", "Fashion", "Jewelry", "Sports", "Antiques", "Luxury"].map((category) => (
-            <Button 
-              key={category} 
-              variant="outline" 
-              size="sm"
-              className="border-purple-700 hover:bg-purple-900/50"
-            >
-              {category}
-            </Button>
-          ))}
-        </div>
+        ))}
+      </div>
 
-        {/* Auction Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {auctionItems.map((item) => (
-            <Card 
-              key={item.id} 
-              className="overflow-hidden hover:shadow-lg transition-all duration-300 bg-gray-900/50 border-purple-900/20"
-            >
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-4">
+      {/* Auction Listings */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {auctionItems.map((item) => (
+          <Card key={item.id} className="p-4 hover:shadow-lg transition bg-gray-900 border-purple-900/20">
+            <div className="flex gap-4">
+              <div className="w-32 h-32 bg-gradient-to-br from-purple-500/10 to-gray-500/10 rounded-md">
+                {/* Replace with actual image */}
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="font-semibold text-lg text-purple-100">{item.name}</h3>
-                    <Badge variant="secondary" className="mt-2 bg-purple-900/50">
+                    <Badge variant="secondary" className="mt-1 bg-purple-900/50">
                       {item.category}
                     </Badge>
                   </div>
@@ -258,7 +259,9 @@ export default function Home() {
 
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Highest Bidder</span>
-                    <span className="text-purple-100">{item.highestBidder}</span>
+                    <span className="text-purple-100">
+                      {item.highestBidder}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-purple-900/20">
@@ -272,11 +275,8 @@ export default function Home() {
                         {item.bids}
                       </span>
                     </div>
-                    <Button 
-                      size="sm" 
-                      className="bg-purple-600 hover:bg-purple-700"
-                    >
-                      Place Bid
+                    <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+                      Bid Now
                     </Button>
                   </div>
                 </div>
