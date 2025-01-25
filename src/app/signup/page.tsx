@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { auth } from "@/firebase";
 import {
   createUserWithEmailAndPassword,
+  updateProfile,
   sendEmailVerification,
 } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -15,8 +18,7 @@ export default function SignUp() {
     email: "",
     password: "",
   });
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -24,6 +26,14 @@ export default function SignUp() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters long", {
+        position: "bottom-right",
+      });
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -31,17 +41,19 @@ export default function SignUp() {
         formData.password
       );
 
+      // Update profile to include the name
+      await updateProfile(userCredential.user, { displayName: formData.name });
+
       // Send verification email
       await sendEmailVerification(userCredential.user);
-      setSuccess(
-        "Account created successfully! A verification email has been sent to your email address. Please verify it to log in."
-      );
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
+      toast.success("Account created! Please verify your email.", {
+        position: "bottom-right",
+      });
+
+      // Redirect to home
+      router.push("/");
+    } catch (err: any) {
+      toast.error(err.message, { position: "bottom-right" });
     }
   };
 
@@ -108,16 +120,6 @@ export default function SignUp() {
             Sign Up
           </Button>
         </form>
-        {success && (
-          <p className="text-green-500 mt-4 text-center">{success}</p>
-        )}
-        {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
-        <div className="mt-6 text-center text-sm text-purple-300">
-          Already have an account?{" "}
-          <a href="/login" className="text-purple-400 hover:underline">
-            Log in
-          </a>
-        </div>
       </Card>
     </div>
   );
