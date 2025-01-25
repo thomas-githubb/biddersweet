@@ -30,32 +30,35 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
     dragFree: true,
   })
 
-  const scrollNext = useCallback(() => {
-    if (emblaApi) emblaApi.scrollNext()
+  const autoplay = useCallback(() => {
+    if (emblaApi) {
+      const engine = emblaApi.internalEngine();
+      engine.location.add(-0.88); // Reduced speed for smoother movement
+      engine.target.set(engine.location.get()); // Update target to match new location
+      engine.scrollLooper.loop(); // Handle looping
+      engine.translate.to(engine.location.get()); // Update translation
+    }
   }, [emblaApi])
 
   useEffect(() => {
     if (!emblaApi) return
 
-    const intervalId = setInterval(scrollNext, 3000)
-
-    const handleMouseEnter = () => clearInterval(intervalId)
-    const handleMouseLeave = () => {
-      clearInterval(intervalId)
-      const newIntervalId = setInterval(scrollNext, 3000)
-      return () => clearInterval(newIntervalId)
+    const play = () => {
+      const intervalId = setInterval(autoplay, 16)
+      return intervalId
     }
+
+    let intervalId = play()
 
     const element = emblaApi.rootNode()
-    element.addEventListener('mouseenter', handleMouseEnter)
-    element.addEventListener('mouseleave', handleMouseLeave)
-
-    return () => {
+    element.addEventListener('mouseenter', () => clearInterval(intervalId))
+    element.addEventListener('mouseleave', () => {
       clearInterval(intervalId)
-      element.removeEventListener('mouseenter', handleMouseEnter)
-      element.removeEventListener('mouseleave', handleMouseLeave)
-    }
-  }, [emblaApi, scrollNext])
+      intervalId = play()
+    })
+
+    return () => clearInterval(intervalId)
+  }, [emblaApi, autoplay])
 
   return (
     <div className="overflow-hidden" ref={emblaRef}>
