@@ -362,48 +362,50 @@ export default function Home() {
     );
   };
 
-  // Update bids and watchers with proper bid tracking
+  // Update bids and watchers less frequently
   useEffect(() => {
     const interval = setInterval(() => {
       setAuctionItemsState(currentItems =>
         currentItems.map(item => {
           const newWatchers = item.watchers + (Math.random() > 0.7 ? 1 : 0);
-          const shouldIncreaseBid = Math.random() > 0.92;
-          const bidIncrement = Math.floor(item.currentBid * (0.01 + Math.random() * 0.02));
+          const shouldIncreaseBid = Math.random() > 0.97; // Reduced from 0.92 to 0.97 (less frequent updates)
+          const bidIncrement = Math.floor(item.currentBid * (0.02 + Math.random() * 0.03)); // Increased increment amount
           
           return shouldIncreaseBid ? {
             ...item,
             watchers: newWatchers,
-            prevBid: item.currentBid, // Store previous bid
+            prevBid: item.currentBid,
             currentBid: item.currentBid + bidIncrement,
             bids: item.bids + 1,
             highestBidder: ['a***x', 'b***y', 'c***z', 'd***w'][Math.floor(Math.random() * 4)]
           } : {
             ...item,
             watchers: newWatchers,
-            prevBid: item.currentBid // Keep tracking previous bid
+            prevBid: item.currentBid
           };
         })
       );
-    }, 1500);
+    }, 3000); // Changed from 1500 to 3000 (less frequent updates)
 
     return () => clearInterval(interval);
   }, []);
 
-  // Handle countdown updates
+  // Simplified countdown handling
   useEffect(() => {
-    const updateCountdowns = () => {
-      const newCountdowns: Record<number, string> = {};
-      filteredItems.forEach(item => {
-        newCountdowns[item.id] = useCountdown(item.endTime);
-      });
-      setCountdowns(newCountdowns);
+    const timeouts: { [key: number]: NodeJS.Timeout } = {};
+    
+    filteredItems.forEach(item => {
+      timeouts[item.id] = setTimeout(() => {
+        setCountdowns(prev => ({
+          ...prev,
+          [item.id]: item.endTime
+        }));
+      }, 1000);
+    });
+
+    return () => {
+      Object.values(timeouts).forEach(timeout => clearTimeout(timeout));
     };
-
-    const interval = setInterval(updateCountdowns, 1000);
-    updateCountdowns(); // Initial update
-
-    return () => clearInterval(interval);
   }, [filteredItems]); // Only re-run when filtered items change
 
   return (
