@@ -7,26 +7,26 @@ import { useEffect, useState } from "react"
 
 interface AnimatedPriceProps {
   value: number
-  prevValue?: number
   className?: string
 }
 
-export function AnimatedPrice({ value, prevValue, className }: AnimatedPriceProps) {
-  const [localPrevValue, setLocalPrevValue] = useState(value)
-  const [isIncreasing, setIsIncreasing] = useState(false)
+export function AnimatedPrice({ value, className }: AnimatedPriceProps) {
+  const [prevValue, setPrevValue] = useState(value);
+  const [isIncreasing, setIsIncreasing] = useState(false);
+  const [increase, setIncrease] = useState(0);
 
   useEffect(() => {
-    if (value > localPrevValue) {
-      setIsIncreasing(true)
+    if (value > prevValue) {
+      const diff = value - prevValue;
+      setIncrease(diff);
+      setIsIncreasing(true);
       const timeout = setTimeout(() => {
-        setIsIncreasing(false)
-      }, 1000)
-      setLocalPrevValue(value)
-      return () => clearTimeout(timeout)
+        setIsIncreasing(false);
+      }, 1000);
+      setPrevValue(value);
+      return () => clearTimeout(timeout);
     }
-  }, [value, localPrevValue])
-
-  const increase = value - localPrevValue
+  }, [value, prevValue]);
 
   return (
     <div className="relative">
