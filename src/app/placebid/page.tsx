@@ -8,6 +8,11 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedPrice } from "@/components/ui/animated-price";
+import { useSearchParams } from 'next/navigation';
+import { database } from "@/firebase";
+import { ref, onValue, set, get } from "firebase/database";
+import { auth } from "@/firebase";
+import { useRouter } from "next/navigation";
 
 // Enhanced mock data
 const auctionItem = {
@@ -41,10 +46,198 @@ const auctionItem = {
   ],
 };
 
+// Generate a random length lorem ipsum description
+function generateDescription(itemName: string | null) {
+  // Use the item name as a seed for consistent randomization
+  const seed = itemName || 'default';
+  const index = seed.length % 4; // Consistent selection based on name
+  
+  const loremIpsum = [
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+    "Ut enim ad minim veniam, quis nostrud exercitation.",
+    "Duis aute irure dolor in reprehenderit in voluptate.",
+    "Excepteur sint occaecat cupidatat non proident."
+  ];
+
+  return `${itemName}: ${loremIpsum[index]}`;
+}
+
+// Generate random details based on category
+function generateItemDetails(category: string | null) {
+  const details: { [key: string]: { [key: string]: string } } = {
+    Art: {
+      medium: ["Oil on Canvas", "Acrylic", "Watercolor", "Mixed Media", "Digital Print"][Math.floor(Math.random() * 5)],
+      period: ["Contemporary", "Modern", "Post-Modern", "Classical", "Renaissance"][Math.floor(Math.random() * 5)],
+      artist: ["John Smith", "Maria Garcia", "David Chen", "Sarah Johnson", "Alex Kim"][Math.floor(Math.random() * 5)],
+      dimensions: `${Math.floor(Math.random() * 100 + 20)}cm x ${Math.floor(Math.random() * 100 + 20)}cm`,
+      condition: ["Mint", "Excellent", "Very Good", "Good", "Fair"][Math.floor(Math.random() * 5)]
+    },
+    Collectibles: {
+      era: ["1950s", "1960s", "1970s", "1980s", "1990s"][Math.floor(Math.random() * 5)],
+      rarity: ["Ultra Rare", "Rare", "Uncommon", "Limited Edition", "Special Release"][Math.floor(Math.random() * 5)],
+      condition: ["Mint in Box", "Sealed", "Like New", "Used", "Vintage Condition"][Math.floor(Math.random() * 5)],
+      authenticity: ["Certified Authentic", "With COA", "Verified Original", "Documentation Included"][Math.floor(Math.random() * 4)],
+      provenance: ["Private Collection", "Original Owner", "Estate Sale", "Dealer Collection"][Math.floor(Math.random() * 4)]
+    },
+    Electronics: {
+      condition: ["New", "Open Box", "Refurbished", "Used - Like New", "Used - Good"][Math.floor(Math.random() * 5)],
+      warranty: ["1 Year", "6 Months", "90 Days", "30 Days", "As-Is"][Math.floor(Math.random() * 5)],
+      specifications: ["High-End Model", "Limited Edition", "Professional Grade", "Consumer Model"][Math.floor(Math.random() * 4)],
+      included: ["Original Box", "All Accessories", "Basic Package", "Core Unit Only"][Math.floor(Math.random() * 4)]
+    },
+    Fashion: {
+      size: ["S", "M", "L", "XL", "One Size"][Math.floor(Math.random() * 5)],
+      condition: ["New with Tags", "Like New", "Gently Used", "Vintage", "Pre-owned"][Math.floor(Math.random() * 5)],
+      material: ["Leather", "Cotton", "Silk", "Wool", "Synthetic"][Math.floor(Math.random() * 5)],
+      style: ["Classic", "Modern", "Vintage", "Designer", "Limited Edition"][Math.floor(Math.random() * 5)]
+    },
+    Jewelry: {
+      material: ["18K Gold", "14K Gold", "Sterling Silver", "Platinum", "White Gold"][Math.floor(Math.random() * 5)],
+      gemstone: ["Diamond", "Ruby", "Sapphire", "Emerald", "Pearl"][Math.floor(Math.random() * 5)],
+      certification: ["GIA Certified", "IGI Certified", "AGS Certified", "Uncertified"][Math.floor(Math.random() * 4)],
+      condition: ["Brand New", "Like New", "Excellent", "Very Good", "Good"][Math.floor(Math.random() * 5)]
+    },
+    Antiques: {
+      period: ["Victorian", "Art Deco", "Mid-Century", "Georgian", "Colonial"][Math.floor(Math.random() * 5)],
+      condition: ["Museum Quality", "Excellent", "Very Good", "Good", "Fair"][Math.floor(Math.random() * 5)],
+      provenance: ["Estate Collection", "Private Collection", "Auction House", "Family Heirloom"][Math.floor(Math.random() * 4)],
+      restoration: ["Original", "Professionally Restored", "Partial Restoration", "Unrestored"][Math.floor(Math.random() * 4)]
+    },
+    Luxury: {
+      brand: ["Rolex", "Louis Vuitton", "Hermès", "Cartier", "Chanel"][Math.floor(Math.random() * 5)],
+      condition: ["New", "Like New", "Excellent", "Very Good", "Good"][Math.floor(Math.random() * 5)],
+      authenticity: ["Full Papers", "Box and Papers", "Authentication Card", "Store Receipt"][Math.floor(Math.random() * 4)],
+      warranty: ["International Warranty", "Store Warranty", "Limited Warranty", "No Warranty"][Math.floor(Math.random() * 4)]
+    }
+  };
+
+  // Default category if none matches
+  const defaultCategory = {
+    condition: ["Excellent", "Very Good", "Good", "Fair"][Math.floor(Math.random() * 4)],
+    dimensions: `${Math.floor(Math.random() * 100 + 20)}cm x ${Math.floor(Math.random() * 100 + 20)}cm`,
+    material: ["Wood", "Metal", "Plastic", "Mixed"][Math.floor(Math.random() * 4)],
+    origin: ["USA", "Europe", "Asia", "Unknown"][Math.floor(Math.random() * 4)]
+  };
+
+  return details[category || ""] || defaultCategory;
+}
+
+// Generate random seller info
+function generateSellerInfo() {
+  const names = ["VintageFinds", "LuxuryTrader", "CollectiblesHub", "ArtisanDealer", "PremiumSeller"];
+  const ratings = [4.9, 4.8, 4.7, 4.95, 5.0];
+  const salesCounts = [156, 234, 89, 445, 178];
+  const years = ["2020", "2021", "2022", "2023"];
+
+  return {
+    name: names[Math.floor(Math.random() * names.length)],
+    rating: ratings[Math.floor(Math.random() * ratings.length)],
+    sales: salesCounts[Math.floor(Math.random() * salesCounts.length)],
+    joined: years[Math.floor(Math.random() * years.length)],
+  };
+}
+
+// Generate details once based on category and keep them consistent
+function generateConsistentDetails(category: string | null, itemId: string | null) {
+  // Use itemId as a seed for consistent randomization
+  const seed = Number(itemId) || 0;
+  
+  const details: { [key: string]: { [key: string]: string[] } } = {
+    Art: {
+      medium: ["Oil on Canvas", "Acrylic", "Watercolor", "Mixed Media", "Digital Print"],
+      period: ["Contemporary", "Modern", "Post-Modern", "Classical", "Renaissance"],
+      artist: ["John Smith", "Maria Garcia", "David Chen", "Sarah Johnson", "Alex Kim"],
+      dimensions: [`${80 + seed}cm x ${100 + seed}cm`],
+      condition: ["Mint", "Excellent", "Very Good", "Good", "Fair"]
+    },
+    Collectibles: {
+      era: ["1950s", "1960s", "1970s", "1980s", "1990s"],
+      rarity: ["Ultra Rare", "Rare", "Uncommon", "Limited Edition", "Special Release"],
+      condition: ["Mint in Box", "Sealed", "Like New", "Used", "Vintage Condition"],
+      authenticity: ["Certified Authentic", "With COA", "Verified Original", "Documentation Included"],
+      provenance: ["Private Collection", "Original Owner", "Estate Sale", "Dealer Collection"]
+    },
+    Electronics: {
+      condition: ["New", "Open Box", "Refurbished", "Used - Like New", "Used - Good"],
+      warranty: ["1 Year", "6 Months", "90 Days", "30 Days", "As-Is"],
+      specifications: ["High-End Model", "Limited Edition", "Professional Grade", "Consumer Model"],
+      included: ["Original Box", "All Accessories", "Basic Package", "Core Unit Only"]
+    },
+    Fashion: {
+      size: ["S", "M", "L", "XL", "One Size"],
+      condition: ["New with Tags", "Like New", "Gently Used", "Vintage", "Pre-owned"],
+      material: ["Leather", "Cotton", "Silk", "Wool", "Synthetic"],
+      style: ["Classic", "Modern", "Vintage", "Designer", "Limited Edition"]
+    },
+    Jewelry: {
+      material: ["18K Gold", "14K Gold", "Sterling Silver", "Platinum", "White Gold"],
+      gemstone: ["Diamond", "Ruby", "Sapphire", "Emerald", "Pearl"],
+      certification: ["GIA Certified", "IGI Certified", "AGS Certified", "Uncertified"],
+      condition: ["Brand New", "Like New", "Excellent", "Very Good", "Good"]
+    },
+    Antiques: {
+      period: ["Victorian", "Art Deco", "Mid-Century", "Georgian", "Colonial"],
+      condition: ["Museum Quality", "Excellent", "Very Good", "Good", "Fair"],
+      provenance: ["Estate Collection", "Private Collection", "Auction House", "Family Heirloom"],
+      restoration: ["Original", "Professionally Restored", "Partial Restoration", "Unrestored"]
+    },
+    Luxury: {
+      brand: ["Rolex", "Louis Vuitton", "Hermès", "Cartier", "Chanel"],
+      condition: ["New", "Like New", "Excellent", "Very Good", "Good"],
+      authenticity: ["Full Papers", "Box and Papers", "Authentication Card", "Store Receipt"],
+      warranty: ["International Warranty", "Store Warranty", "Limited Warranty", "No Warranty"]
+    }
+  };
+
+  const defaultCategory = {
+    condition: ["Excellent", "Very Good", "Good", "Fair"],
+    dimensions: [`${80 + seed}cm x ${100 + seed}cm`],
+    material: ["Wood", "Metal", "Plastic", "Mixed"],
+    origin: ["USA", "Europe", "Asia", "Unknown"]
+  };
+
+  const categoryDetails = details[category || ""] || defaultCategory;
+  
+  // Create a consistent selection for each property
+  const result: { [key: string]: string } = {};
+  for (const [key, values] of Object.entries(categoryDetails)) {
+    const index = seed % values.length;
+    result[key] = values[index];
+  }
+
+  return result;
+}
+
 export default function AuctionItemPage() {
-  const [selectedImage, setSelectedImage] = useState(auctionItem.images[0]);
-  const [currentBid, setCurrentBid] = useState(auctionItem.currentBid);
-  const [bidHistory, setBidHistory] = useState(auctionItem.bidHistory);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [user, setUser] = useState<any>(null);
+  
+  // Get item details from URL parameters
+  const itemDetails = {
+    id: searchParams.get('id'),
+    name: searchParams.get('name'),
+    currentBid: Number(searchParams.get('currentBid')),
+    image: searchParams.get('image'),
+    endTime: searchParams.get('endTime'),
+    watchers: Number(searchParams.get('watchers')),
+    bids: Number(searchParams.get('bids')),
+    category: searchParams.get('category'),
+    highestBidder: searchParams.get('highestBidder'),
+    description: generateDescription(searchParams.get('name')),
+    details: generateConsistentDetails(searchParams.get('category'), searchParams.get('id')),
+    seller: generateSellerInfo()
+  };
+
+  const [selectedImage, setSelectedImage] = useState(itemDetails.image);
+  const [currentBid, setCurrentBid] = useState(itemDetails.currentBid);
+  const [bidHistory, setBidHistory] = useState([
+    { 
+      bidder: itemDetails.highestBidder || "Anonymous", 
+      bid: itemDetails.currentBid,
+      timestamp: new Date().toISOString()
+    }
+  ]);
   const [isWatching, setIsWatching] = useState(false);
   const [customBidAmount, setCustomBidAmount] = useState("");
   const [activeTab, setActiveTab] = useState("details");
@@ -52,24 +245,94 @@ export default function AuctionItemPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState(0);
 
-  const handlePlaceBid = (increment: number) => {
-    const newBid = currentBid + increment;
-    const newBidEntry = {
-      bidder: "You",
-      bid: newBid,
-      timestamp: new Date().toISOString(),
-    };
+  // Set up real-time connection with better error handling
+  useEffect(() => {
+    if (!itemDetails.id) {
+      console.log("No item ID provided");
+      return;
+    }
 
-    setCurrentBid(newBid);
-    setBidHistory([newBidEntry, ...bidHistory]);
+    console.log("Attempting to connect to Firebase...");
+    console.log("Database instance:", database); // Check if database is initialized
+
+    try {
+      const itemRef = ref(database, `auctions/${itemDetails.id}`);
+      console.log("Created reference:", itemRef);
+      
+      // Initialize auction data if it doesn't exist
+      get(itemRef)
+        .then((snapshot) => {
+          console.log("Got snapshot:", snapshot.val());
+          if (!snapshot.exists()) {
+            console.log("No existing data, initializing...");
+            const initialData = {
+              currentBid: itemDetails.currentBid,
+              highestBidder: itemDetails.highestBidder || "Anonymous",
+              bidHistory: [{
+                bidder: itemDetails.highestBidder || "Anonymous",
+                bid: itemDetails.currentBid,
+                timestamp: new Date().toISOString()
+              }]
+            };
+            
+            return set(itemRef, initialData);
+          }
+        })
+        .then(() => {
+          console.log("Data initialized successfully");
+        })
+        .catch((error) => {
+          console.error("Firebase initialization error:", error);
+        });
+
+      // Listen for changes
+      const unsubscribe = onValue(itemRef, (snapshot) => {
+        console.log("Received update:", snapshot.val());
+        const data = snapshot.val();
+        if (data) {
+          setCurrentBid(data.currentBid);
+          setBidHistory(data.bidHistory || []);
+        }
+      }, (error) => {
+        console.error("Firebase subscription error:", error);
+      });
+
+      return () => {
+        console.log("Cleaning up Firebase connection");
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error("Firebase setup error:", error);
+    }
+  }, [itemDetails.id, itemDetails.highestBidder]);
+
+  // Check authentication state
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleBidAttempt = (amount: number) => {
+    if (!user) {
+      // Redirect to login if not authenticated
+      router.push('/login');
+      return;
+    }
+    handleBidConfirmation(amount);
   };
 
   const handleCustomBid = () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     const amount = parseInt(customBidAmount);
     if (!isNaN(amount) && amount > currentBid) {
       handleBidConfirmation(amount);
     } else {
-      // Optional: Add error feedback
       alert("Please enter a valid amount higher than the current bid");
     }
   };
@@ -80,7 +343,7 @@ export default function AuctionItemPage() {
   };
 
   const confirmBid = () => {
-    handlePlaceBid(pendingBidAmount - currentBid);
+    setCurrentBid(pendingBidAmount);
     setShowConfirmation(false);
     setCustomBidAmount("");
   };
@@ -102,7 +365,7 @@ export default function AuctionItemPage() {
             >
               <Image
                 src={selectedImage}
-                alt={auctionItem.name}
+                alt={itemDetails.name}
                 layout="fill"
                 objectFit="cover"
                 className="transition-transform duration-300"
@@ -157,18 +420,18 @@ export default function AuctionItemPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Badge variant="secondary" className="bg-purple-900/50">
-                {auctionItem.category}
+                {itemDetails.category}
               </Badge>
               <Badge variant="destructive" className="flex items-center">
                 <Timer className="w-4 h-4 mr-1" />
-                {auctionItem.endTime}
+                {itemDetails.endTime}
               </Badge>
             </div>
             <h1 className="text-3xl font-bold text-purple-100 mb-4">
-              {auctionItem.name}
+              {itemDetails.name}
             </h1>
             <p className="text-gray-400 leading-relaxed">
-              {auctionItem.description}
+              {itemDetails.description}
             </p>
           </div>
 
@@ -183,38 +446,49 @@ export default function AuctionItemPage() {
                 />
               </div>
               
-              <div className="grid grid-cols-3 gap-2">
-                {[100, 250, 500].map((amount) => (
-                  <motion.button
-                    key={amount}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md font-medium transition-colors duration-200"
-                    onClick={() => handleBidConfirmation(currentBid + amount)}
-                  >
-                    +${amount}
-                  </motion.button>
-                ))}
-              </div>
-
-              <div className="flex space-x-2">
-                <input
-                  type="number"
-                  value={customBidAmount}
-                  onChange={(e) => setCustomBidAmount(e.target.value)}
-                  placeholder="Enter Bid Amount"
-                  min={currentBid + 1}
-                  className="flex-1 px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
-                />
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-md font-medium transition-colors duration-200"
-                  onClick={handleCustomBid}
+              {!user ? (
+                <Button 
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  onClick={() => router.push('/login')}
                 >
-                  Bid
-                </motion.button>
-              </div>
+                  Login to Place Bid
+                </Button>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[100, 250, 500].map((amount) => (
+                      <motion.button
+                        key={amount}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md font-medium transition-colors duration-200"
+                        onClick={() => handleBidAttempt(currentBid + amount)}
+                      >
+                        +${amount}
+                      </motion.button>
+                    ))}
+                  </div>
+
+                  <div className="flex space-x-2">
+                    <input
+                      type="number"
+                      value={customBidAmount}
+                      onChange={(e) => setCustomBidAmount(e.target.value)}
+                      placeholder="Enter Bid Amount"
+                      min={currentBid + 1}
+                      className="flex-1 px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-md font-medium transition-colors duration-200"
+                      onClick={handleCustomBid}
+                    >
+                      Bid
+                    </motion.button>
+                  </div>
+                </>
+              )}
             </div>
           </Card>
 
@@ -329,7 +603,7 @@ export default function AuctionItemPage() {
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-4"
               >
-                {Object.entries(auctionItem.details).map(([key, value]) => (
+                {Object.entries(itemDetails.details).map(([key, value]) => (
                   <div key={key} className="flex justify-between">
                     <span className="text-gray-400 capitalize">{key}</span>
                     <span className="text-purple-100">{value}</span>
@@ -348,16 +622,16 @@ export default function AuctionItemPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-purple-900/50 rounded-full flex items-center justify-center">
-                      {auctionItem.seller.name[0]}
+                      {itemDetails.seller.name[0]}
                     </div>
                     <div>
-                      <div className="font-semibold text-purple-100">{auctionItem.seller.name}</div>
-                      <div className="text-sm text-gray-400">Member since {auctionItem.seller.joined}</div>
+                      <div className="font-semibold text-purple-100">{itemDetails.seller.name}</div>
+                      <div className="text-sm text-gray-400">Member since {itemDetails.seller.joined}</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-purple-100">{auctionItem.seller.rating} ⭐</div>
-                    <div className="text-sm text-gray-400">{auctionItem.seller.sales} sales</div>
+                    <div className="text-purple-100">{itemDetails.seller.rating} ⭐</div>
+                    <div className="text-sm text-gray-400">{itemDetails.seller.sales} sales</div>
                   </div>
                 </div>
               </motion.div>

@@ -509,7 +509,9 @@ export default function Home() {
                       className="bg-purple-600 hover:bg-purple-700"
                       asChild
                     >
-                      <a href="/placebid">Bid Now</a>
+                      <a href={`/placebid?id=${item.id}&name=${encodeURIComponent(item.name)}&currentBid=${item.currentBid}&image=${encodeURIComponent(item.image)}&endTime=${encodeURIComponent(item.endTime)}&watchers=${item.watchers}&bids=${item.bids}&category=${item.category}&highestBidder=${item.highestBidder}`}>
+                        Bid Now
+                      </a>
                     </Button>
                   </div>
                 </div>

@@ -161,7 +161,9 @@ export function TrendingCarousel({ items: initialItems }: TrendingCarouselProps)
                       className="w-full bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-900/20"
                       asChild
                     >
-                      <a href="/placebid">Place Bid</a>
+                      <a href={`/placebid?id=${item.id}&name=${encodeURIComponent(item.name)}&currentBid=${item.currentBid}&image=${encodeURIComponent(item.image)}&endTime=${encodeURIComponent(item.endTime)}&watchers=${item.watchers}&bids=${item.bids}`}>
+                        Place Bid
+                      </a>
                     </Button>
                   </div>
                 </Card>
