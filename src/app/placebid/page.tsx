@@ -7,6 +7,7 @@ import { Timer, Eye, Heart, DollarSign, ChevronUp, ChevronDown, Share2, Bell, In
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { AnimatedPrice } from "@/components/ui/animated-price";
 
 // Enhanced mock data
 const auctionItem = {
@@ -48,6 +49,8 @@ export default function AuctionItemPage() {
   const [customBidAmount, setCustomBidAmount] = useState("");
   const [activeTab, setActiveTab] = useState("details");
   const [zoomedImage, setZoomedImage] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [pendingBidAmount, setPendingBidAmount] = useState(0);
 
   const handlePlaceBid = (increment: number) => {
     const newBid = currentBid + increment;
@@ -63,10 +66,23 @@ export default function AuctionItemPage() {
 
   const handleCustomBid = () => {
     const amount = parseInt(customBidAmount);
-    if (amount > currentBid) {
-      handlePlaceBid(amount - currentBid);
-      setCustomBidAmount("");
+    if (!isNaN(amount) && amount > currentBid) {
+      handleBidConfirmation(amount);
+    } else {
+      // Optional: Add error feedback
+      alert("Please enter a valid amount higher than the current bid");
     }
+  };
+
+  const handleBidConfirmation = (amount: number) => {
+    setPendingBidAmount(amount);
+    setShowConfirmation(true);
+  };
+
+  const confirmBid = () => {
+    handlePlaceBid(pendingBidAmount - currentBid);
+    setShowConfirmation(false);
+    setCustomBidAmount("");
   };
 
   return (
@@ -156,35 +172,29 @@ export default function AuctionItemPage() {
             </p>
           </div>
 
-          {/* Current Bid Section */}
+          {/* Current Bid Section with enhanced animations */}
           <Card className="p-6 bg-gradient-to-br from-purple-900/20 to-gray-900/20 border-purple-900/20">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Current Bid</span>
-                <div className="text-2xl font-bold text-purple-100">
-                  ${currentBid.toLocaleString()}
-                </div>
+                <AnimatedPrice
+                  value={currentBid}
+                  className="text-2xl font-bold text-purple-100"
+                />
               </div>
               
               <div className="grid grid-cols-3 gap-2">
-                <Button 
-                  className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => handlePlaceBid(100)}
-                >
-                  +$100
-                </Button>
-                <Button 
-                  className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => handlePlaceBid(250)}
-                >
-                  +$250
-                </Button>
-                <Button 
-                  className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => handlePlaceBid(500)}
-                >
-                  +$500
-                </Button>
+                {[100, 250, 500].map((amount) => (
+                  <motion.button
+                    key={amount}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md font-medium transition-colors duration-200"
+                    onClick={() => handleBidConfirmation(currentBid + amount)}
+                  >
+                    +${amount}
+                  </motion.button>
+                ))}
               </div>
 
               <div className="flex space-x-2">
@@ -192,18 +202,87 @@ export default function AuctionItemPage() {
                   type="number"
                   value={customBidAmount}
                   onChange={(e) => setCustomBidAmount(e.target.value)}
-                  placeholder="Enter custom amount"
-                  className="flex-1 px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Enter Bid Amount"
+                  min={currentBid + 1}
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
                 />
-                <Button 
-                  className="bg-purple-600 hover:bg-purple-700"
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-md font-medium transition-colors duration-200"
                   onClick={handleCustomBid}
                 >
                   Bid
-                </Button>
+                </motion.button>
               </div>
             </div>
           </Card>
+
+          {/* Bid Confirmation Modal */}
+          <AnimatePresence>
+            {showConfirmation && (
+              <>
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+                  onClick={() => setShowConfirmation(false)}
+                />
+                
+                {/* Modal - positioned much higher */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 p-4"
+                  style={{ 
+                    transform: 'translate(-50%, calc(-50% - 40vh))',  // Much higher (from -25vh to -40vh)
+                    marginLeft: '-15vw'  // Keeping the same horizontal position
+                  }}
+                >
+                  <Card className="p-6 bg-gray-900/95 border-purple-500/20 backdrop-blur-lg shadow-xl">
+                    <h3 className="text-xl font-bold text-purple-100 mb-4">Confirm Your Bid</h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Current Bid</span>
+                        <span className="text-purple-100">${currentBid.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Your Bid</span>
+                        <span className="text-green-400 font-bold">${pendingBidAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-purple-900/50">
+                        <span className="text-gray-400">Increase Amount</span>
+                        <span className="text-green-400 font-bold">
+                          +${(pendingBidAmount - currentBid).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex space-x-3 pt-4">
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          className="flex-1 bg-gray-800 text-gray-300 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200"
+                          onClick={() => setShowConfirmation(false)}
+                        >
+                          Cancel
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          className="flex-1 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 transition-colors duration-200"
+                          onClick={confirmBid}
+                        >
+                          Confirm Bid
+                        </motion.button>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
 
           {/* Tabs */}
           <div className="border-b border-gray-800">

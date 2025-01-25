@@ -16,28 +16,32 @@ export function AnimatedPrice({ value, className }: AnimatedPriceProps) {
   const [increase, setIncrease] = useState(0);
 
   useEffect(() => {
-    if (value > prevValue) {
+    let timeout: NodeJS.Timeout;
+    
+    if (value !== prevValue && value > prevValue) {
       const diff = value - prevValue;
       setIncrease(diff);
       setIsIncreasing(true);
       setPrevValue(value);
-
-      const timeout = setTimeout(() => {
+      
+      timeout = setTimeout(() => {
         setIsIncreasing(false);
-      }, 1000);
-
-      return () => clearTimeout(timeout);
+      }, 1500);
     }
-  }, [value, prevValue]);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [value]);
 
   return (
-    <div className="relative">
+    <div className="relative min-h-[30px]">
       <div className={cn("flex items-center", className)}>
         <DollarSign className="w-4 h-4 mr-1" />
         <motion.span
           key={value}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0.5, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
           className="font-bold"
         >
           {value.toLocaleString()}
@@ -45,21 +49,21 @@ export function AnimatedPrice({ value, className }: AnimatedPriceProps) {
       </div>
       
       <AnimatePresence>
-        {isIncreasing && (
+        {isIncreasing && increase > 0 && (
           <>
-            {/* Rising number with arrow */}
+            {/* Rising number with arrow - slightly higher */}
             <motion.div
-              initial={{ opacity: 1, y: 0 }}
-              animate={{ opacity: 0, y: -30 }}
+              initial={{ opacity: 0, y: 0 }}
+              animate={{ opacity: 1, y: -15 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="absolute -top-1 left-0 text-green-400 font-bold flex items-center"
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="absolute top-0 left-0 text-green-400 font-bold flex items-center"
             >
               <ArrowUp className="w-3 h-3 mr-1" />
               +{Math.floor(increase).toLocaleString()}
             </motion.div>
 
-            {/* Sparkles */}
+            {/* Sparkles - adjusted to match */}
             {[...Array(3)].map((_, i) => (
               <motion.div
                 key={`sparkle-${i}`}
@@ -68,9 +72,9 @@ export function AnimatedPrice({ value, className }: AnimatedPriceProps) {
                   opacity: [0, 1, 0],
                   scale: [0, 1, 0],
                   x: [-10 + (i * 10), 0, 10 + (i * 10)],
-                  y: [0, -20, -40]
+                  y: [0, -10, -20]
                 }}
-                transition={{ duration: 0.6, delay: i * 0.1 }}
+                transition={{ duration: 0.8, delay: i * 0.1 }}
                 className="absolute top-0 right-0 w-1 h-1 bg-purple-400 rounded-full"
               />
             ))}
