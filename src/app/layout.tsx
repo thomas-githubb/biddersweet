@@ -27,7 +27,7 @@ export default function RootLayout({
               <a href="/sports" className="hover:text-primary transition">Sports</a>
               <a href="/activity" className="hover:text-primary transition">Activity</a>
               <a href="/ranks" className="hover:text-primary transition">Ranks</a>
-              <button className="text-primary hover:text-primary/90">Log In</button>
+              <button className="text-primary hover:text-primary/90">Log I</button>
               <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">
                 Sign Up
               </button>
