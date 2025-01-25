@@ -11,6 +11,7 @@ import {
   MessageSquare,
   HelpCircle
 } from "lucide-react";
+import Link from "next/link";
 
 export default function RootLayout({
   children,
@@ -23,7 +24,12 @@ export default function RootLayout({
         <header className="fixed top-0 w-full bg-background border-b border-border z-50">
           <nav className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
-              <div className="text-xl font-bold text-primary">BidderSweet</div>
+              <Link 
+                href="/" 
+                className="text-xl font-bold text-primary hover:text-primary/90 transition-colors"
+              >
+                BidderSweet
+              </Link>
               <div className="relative">
                 <input
                   type="search"
