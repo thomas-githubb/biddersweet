@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Timer, DollarSign, Eye, Heart } from "lucide-react";
 import { TrendingCarousel } from "@/components/trending-carousel";
 
-// Mock data for trending items
+// Expanded mock data for trending items
 const trendingItems = [
   {
     id: 1,
@@ -42,6 +42,60 @@ const trendingItems = [
     bids: 12,
     watchers: 178,
   },
+  {
+    id: 5,
+    name: "Rare Pokemon Card Collection",
+    currentBid: 5000,
+    endTime: "6h 10m",
+    image: "/pokemon.jpg",
+    bids: 45,
+    watchers: 312,
+  },
+  {
+    id: 6,
+    name: "Vintage Hermès Birkin Bag",
+    currentBid: 18000,
+    endTime: "3h 55m",
+    image: "/bag.jpg",
+    bids: 19,
+    watchers: 245,
+  },
+  {
+    id: 7,
+    name: "1955 Porsche Speedster",
+    currentBid: 145000,
+    endTime: "12h 30m",
+    image: "/car.jpg",
+    bids: 8,
+    watchers: 567,
+  },
+  {
+    id: 8,
+    name: "Ancient Roman Coin Set",
+    currentBid: 3500,
+    endTime: "8h 15m",
+    image: "/coins.jpg",
+    bids: 27,
+    watchers: 134,
+  },
+  {
+    id: 9,
+    name: "Original Star Wars Poster",
+    currentBid: 2800,
+    endTime: "5h 45m",
+    image: "/poster.jpg",
+    bids: 16,
+    watchers: 98,
+  },
+  {
+    id: 10,
+    name: "Signed Michael Jordan Jersey",
+    currentBid: 9500,
+    endTime: "7h 20m",
+    image: "/jersey.jpg",
+    bids: 34,
+    watchers: 289,
+  }
 ];
 
 // Mock data for auction listings

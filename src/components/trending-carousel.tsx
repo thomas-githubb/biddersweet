@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import useEmblaCarousel, { EmblaCarouselType } from 'embla-carousel-react'
+import useEmblaCarousel from 'embla-carousel-react'
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Timer, DollarSign, Eye, Heart } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useCallback } from "react"
 
 interface TrendingItem {
   id: number
@@ -24,27 +24,48 @@ interface TrendingCarouselProps {
 
 export function TrendingCarousel({ items }: TrendingCarouselProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
-    align: 'start',
     loop: true,
+    align: 'start',
+    skipSnaps: false,
     dragFree: true,
-    containScroll: 'trimSnaps'
   })
+
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext()
+  }, [emblaApi])
 
   useEffect(() => {
     if (!emblaApi) return
 
-    const interval = setInterval(() => {
-      emblaApi.scrollNext()
-    }, 3000) // Scroll every 3 seconds
+    const intervalId = setInterval(scrollNext, 3000)
 
-    return () => clearInterval(interval)
-  }, [emblaApi])
+    const handleMouseEnter = () => clearInterval(intervalId)
+    const handleMouseLeave = () => {
+      clearInterval(intervalId)
+      const newIntervalId = setInterval(scrollNext, 3000)
+      return () => clearInterval(newIntervalId)
+    }
+
+    const element = emblaApi.rootNode()
+    element.addEventListener('mouseenter', handleMouseEnter)
+    element.addEventListener('mouseleave', handleMouseLeave)
+
+    return () => {
+      clearInterval(intervalId)
+      element.removeEventListener('mouseenter', handleMouseEnter)
+      element.removeEventListener('mouseleave', handleMouseLeave)
+    }
+  }, [emblaApi, scrollNext])
 
   return (
     <div className="overflow-hidden" ref={emblaRef}>
       <div className="flex">
-        {items.map((item) => (
-          <div key={item.id} className="flex-[0_0_90%] min-w-0 pl-4 md:flex-[0_0_45%] lg:flex-[0_0_30%]">
+        {/* Duplicate items at the end for seamless looping */}
+        {[...items, ...items].map((item, index) => (
+          <div 
+            key={`${item.id}-${index}`} 
+            className="flex-[0_0_90%] min-w-0 pl-4 md:flex-[0_0_45%] lg:flex-[0_0_30%]"
+          >
             <Card className="overflow-hidden hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-900/20 to-gray-900/20 border-purple-900/20">
               <div className="relative h-48 bg-gradient-to-br from-purple-500/10 to-gray-500/10">
                 {/* Replace with actual images */}
