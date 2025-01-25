@@ -11,11 +11,13 @@ import {
   Bell,
   MessageSquare,
   HelpCircle,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { auth } from "@/firebase";
 import { signOut } from "firebase/auth";
+import { Button } from "@/components/ui/button";
 
 export default function RootLayout({
   children,
@@ -57,6 +59,15 @@ export default function RootLayout({
               </div>
             </div>
             <div className="flex items-center space-x-6">
+              <Button 
+                className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+                asChild
+              >
+                <Link href="/create-auction">
+                  <Plus className="w-4 h-4" />
+                  Create Auction
+                </Link>
+              </Button>
               <a href="/auctions" className="hover:text-primary transition">
                 Auctions
               </a>
