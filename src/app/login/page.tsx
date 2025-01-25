@@ -5,10 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -18,13 +20,12 @@ export default function Login() {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      alert("Logged in successfully!");
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
+      toast.success("Logged in successfully!", { position: "bottom-right" });
+
+      // Redirect to home
+      router.push("/");
+    } catch (err: any) {
+      toast.error(err.message, { position: "bottom-right" });
     }
   };
 
@@ -75,13 +76,6 @@ export default function Login() {
             Log In
           </Button>
         </form>
-        {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
-        <div className="mt-6 text-center text-sm text-purple-300">
-          New here?{" "}
-          <a href="/signup" className="text-purple-400 hover:underline">
-            Create an account
-          </a>
-        </div>
       </Card>
     </div>
   );
