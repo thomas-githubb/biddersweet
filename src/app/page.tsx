@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { useCountdown } from "@/hooks/useCountdown";
 import { AnimatedPrice } from "@/components/ui/animated-price"
 import { AnimatedHeart } from "@/components/ui/animated-heart"
-import { supabase } from "@/lib/supabase";
+import { supabase, getAllAuctions } from "@/lib/supabase";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -106,176 +106,56 @@ const trendingItems = [
   },
 ];
 
-const auctionItems = [
-  {
-    id: 1,
-    name: "Antique Victorian Desk",
-    currentBid: 2500,
-    endTime: "12h 30m",
-    image: "/desk.jpg",
-    category: "Furniture",
-    bids: 8,
-    watchers: 45,
-    highestBidder: "j***n",
-  },
-  {
-    id: 2,
-    name: "Vintage Rolex Submariner",
-    currentBid: 15000,
-    endTime: "2h 45m",
-    image: "/watch.jpg",
-    category: "Luxury",
-    bids: 23,
-    watchers: 156,
-    highestBidder: "b***y",
-  },
-  {
-    id: 3,
-    name: "First Edition Harry Potter",
-    currentBid: 8500,
-    endTime: "4h 15m",
-    image: "/book.jpg",
-    category: "Collectibles",
-    bids: 15,
-    watchers: 89,
-    highestBidder: "m***e",
-  },
-  {
-    id: 4,
-    name: "1967 Gibson Les Paul",
-    currentBid: 12000,
-    endTime: "1h 30m",
-    image: "/guitar.jpg",
-    category: "Music",
-    bids: 31,
-    watchers: 203,
-    highestBidder: "g***s",
-  },
-  {
-    id: 5,
-    name: "Original Andy Warhol Print",
-    currentBid: 25000,
-    endTime: "5h 20m",
-    image: "/art.jpg",
-    category: "Art",
-    bids: 12,
-    watchers: 178,
-    highestBidder: "a***r",
-  },
-  {
-    id: 6,
-    name: "Rare Pokemon Card Collection",
-    currentBid: 5000,
-    endTime: "6h 10m",
-    image: "/pokemon.jpg",
-    category: "Collectibles",
-    bids: 45,
-    watchers: 312,
-    highestBidder: "p***n",
-  },
-  {
-    id: 7,
-    name: "Vintage Hermès Birkin Bag",
-    currentBid: 18000,
-    endTime: "3h 55m",
-    image: "/bag.jpg",
-    category: "Luxury",
-    bids: 19,
-    watchers: 245,
-    highestBidder: "b***n",
-  },
-  {
-    id: 8,
-    name: "1955 Porsche Speedster",
-    currentBid: 145000,
-    endTime: "2d 12h 30m",
-    image: "/car.jpg",
-    category: "Automobile",
-    bids: 8,
-    watchers: 567,
-    highestBidder: "p***y",
-  },
-  {
-    id: 9,
-    name: "Ancient Roman Coin Set",
-    currentBid: 3500,
-    endTime: "3d 8h 15m",
-    image: "/coins.jpg",
-    category: "Antiques",
-    bids: 27,
-    watchers: 134,
-    highestBidder: "r***n",
-  },
-  {
-    id: 10,
-    name: "Original Star Wars Poster",
-    currentBid: 2800,
-    endTime: "5h 45m",
-    image: "/poster.jpg",
-    category: "Art",
-    bids: 16,
-    watchers: 98,
-    highestBidder: "s***s",
-  },
-  {
-    id: 11,
-    name: "Signed Michael Jordan Jersey",
-    currentBid: 9500,
-    endTime: "7h 20m",
-    image: "/jersey.jpg",
-    category: "Sports",
-    bids: 34,
-    watchers: 289,
-    highestBidder: "j***n",
-  },
-];
-
 interface AuctionItem {
-  id: number;
-  name: string;
-  currentBid: number;
-  endTime: string;
-  image: string;
+  id: string;
+  title: string;
+  description: string;
+  current_bid: number;
+  end_time: string;
+  image_url: string;
   category: string;
-  bids: number;
   watchers: number;
-  highestBidder: string;
-  isLiked: boolean;
-  prevBid: number;
+  total_bids: number;
+  highest_bidder: string;
+  isLiked?: boolean;
 }
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("All Items");
   const [visibleItems, setVisibleItems] = useState(10);
-  const [auctionItemsState, setAuctionItemsState] = useState<AuctionItem[]>(
-    auctionItems.map(item => ({
-      ...item,
-      isLiked: false,
-      watchers: item.watchers,
-      bids: item.bids,
-      currentBid: item.currentBid,
-      prevBid: item.currentBid
-    }))
-  );
+  const [auctions, setAuctions] = useState<AuctionItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch auctions when component mounts
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getAllAuctions();
+        // Add isLiked property to each auction
+        const auctionsWithLikes = data.map(auction => ({
+          ...auction,
+          isLiked: false
+        }));
+        setAuctions(auctionsWithLikes);
+      } catch (error) {
+        console.error('Error fetching auctions:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAuctions();
+  }, []);
 
   // Filter items based on selected category
-  const filteredItems = auctionItemsState.filter(item => 
+  const filteredItems = auctions.filter(item => 
     selectedCategory === "All Items" ? true : item.category === selectedCategory
   );
 
-  // Reset visible items when category changes
-  useEffect(() => {
-    setVisibleItems(10);
-  }, [selectedCategory]);
-
-  // Function to load more items
-  const loadMore = () => {
-    setVisibleItems(prev => prev + 9);
-  };
-
   // Handle likes for auction items
-  const toggleAuctionLike = (itemId: number) => {
-    setAuctionItemsState(currentItems =>
+  const toggleAuctionLike = (itemId: string) => {
+    setAuctions(currentItems =>
       currentItems.map(item =>
         item.id === itemId
           ? { ...item, isLiked: !item.isLiked }
@@ -325,20 +205,20 @@ export default function Home() {
           {filteredItems.slice(0, visibleItems).map((item) => (
             <Link 
               key={item.id}
-              href={`/placebid?id=${item.id}&name=${item.name}&currentBid=${item.currentBid}&image=${item.image}&endTime=${item.endTime}&category=${item.category}&watchers=${item.watchers}&bids=${item.bids}&highestBidder=${item.highestBidder}`}
+              href={`/placebid?id=${item.id}&name=${encodeURIComponent(item.title)}&currentBid=${item.current_bid}&image=${encodeURIComponent(item.image_url)}&endTime=${encodeURIComponent(item.end_time)}&category=${encodeURIComponent(item.category)}&watchers=${item.watchers}&bids=${item.total_bids}&highestBidder=${encodeURIComponent(item.highest_bidder)}`}
             >
               <Card className="overflow-hidden bg-gray-900 border-gray-800 hover:border-purple-500/50 transition-colors">
                 <div className="relative aspect-square">
                   <Image
-                    src={item.image}
-                    alt={item.name}
+                    src={item.image_url}
+                    alt={item.title}
                     layout="fill"
                     objectFit="cover"
                   />
                   <div className="absolute top-2 right-2 space-x-2">
                     <Badge variant="destructive" className="flex items-center text-xs">
                       <Timer className="w-3 h-3 mr-1" />
-                      {item.endTime}
+                      {useCountdown(item.end_time)}
                     </Badge>
                   </div>
                 </div>
@@ -347,7 +227,7 @@ export default function Home() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold text-base text-purple-100 line-clamp-1">
-                        {item.name}
+                        {item.title}
                       </h3>
                       <Badge 
                         variant="secondary" 
@@ -358,11 +238,11 @@ export default function Home() {
                     </div>
                     <AnimatedHeart
                       isLiked={item.isLiked}
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.preventDefault();
                         toggleAuctionLike(item.id);
                       }}
-                      className="w-4 h-4"
+                      count={item.total_bids}
                     />
                   </div>
 
@@ -373,7 +253,7 @@ export default function Home() {
                         {item.watchers}
                       </div>
                       <div className="flex items-center">
-                        {item.bids} bids
+                        {item.total_bids} bids
                       </div>
                     </div>
 
@@ -381,13 +261,13 @@ export default function Home() {
                       <div>
                         <p className="text-xs text-gray-400">Current Bid</p>
                         <AnimatedPrice
-                          value={item.currentBid}
+                          value={item.current_bid}
                           className="text-sm font-bold text-purple-100"
                         />
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-gray-400">Highest Bidder</p>
-                        <p className="text-sm text-purple-100">{item.highestBidder}</p>
+                        <p className="text-sm text-purple-100">{item.highest_bidder}</p>
                       </div>
                     </div>
                   </div>
@@ -400,7 +280,7 @@ export default function Home() {
         {filteredItems.length > visibleItems && (
           <div className="flex justify-center mt-8">
             <Button
-              onClick={loadMore}
+              onClick={() => setVisibleItems(prev => prev + 8)}
               variant="outline"
               className="border-purple-700 hover:bg-purple-900/50"
             >
