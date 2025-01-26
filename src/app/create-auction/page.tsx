@@ -83,23 +83,29 @@ export default function CreateAuctionPage() {
     e.preventDefault();
     
     if (!auth.currentUser) {
-      toast.error("Please login to create an auction");
       router.push('/login');
       return;
     }
 
     if (!formData.title || !formData.description || !formData.startingBid) {
-      toast.error("Please fill in all required fields");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      console.log('Starting auction creation with form data:', formData);
+      // Upload image if exists
+      let imageUrl = '/placeholder.jpg';
+      if (images.length > 0) {
+        try {
+          imageUrl = await uploadImage(images[0].file);
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+        }
+      }
 
-      // Create the auction with basic data first
-      const result = await createNewAuction({
+      // Create the auction
+      await createNewAuction({
         title: formData.title,
         description: formData.description,
         starting_bid: parseFloat(formData.startingBid),
@@ -108,15 +114,12 @@ export default function CreateAuctionPage() {
         condition: formData.condition,
         dimensions: formData.dimensions,
         material: formData.material,
-        image_url: '/placeholder.jpg' // Start with placeholder
+        image_url: imageUrl
       });
 
-      console.log('Auction created successfully:', result);
-      toast.success("Auction created successfully!");
       router.push("/");
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error in handleSubmit:', error);
-      toast.error(error.message || "Failed to create auction");
     } finally {
       setIsSubmitting(false);
     }

@@ -429,10 +429,7 @@ export async function createNewAuction(auctionData: {
       throw new Error('User not authenticated');
     }
 
-    // Log the incoming data
-    console.log('Creating auction with data:', auctionData);
-
-    // Create the auction payload matching your exact SQL schema
+    // Create the auction payload
     const auctionPayload = {
       title: auctionData.title,
       description: auctionData.description,
@@ -440,8 +437,8 @@ export async function createNewAuction(auctionData: {
       current_bid: auctionData.starting_bid,
       end_time: new Date(Date.now() + parseInt(auctionData.duration) * 60 * 60 * 1000).toISOString(),
       created_at: new Date().toISOString(),
-      image_url: '/placeholder.jpg',
-      category: auctionData.category || 'Art', // Ensure category is never null
+      image_url: auctionData.image_url, // Use the provided image URL
+      category: auctionData.category || 'Art',
       user_id: firebaseUser.uid,
       highest_bidder: 'Anonymous',
       status: 'active',
@@ -453,8 +450,6 @@ export async function createNewAuction(auctionData: {
       seller_sales: 0
     };
 
-    console.log('Auction payload:', auctionPayload);
-
     // Insert the auction
     const { data, error } = await supabase
       .from('auctions')
@@ -463,56 +458,55 @@ export async function createNewAuction(auctionData: {
       .single();
 
     if (error) {
-      console.error('Detailed Supabase error:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('Detailed Supabase error:', error);
       throw new Error(`Database error: ${error.message}`);
     }
 
-    if (!data) {
-      throw new Error('No data returned from auction creation');
-    }
-
-    console.log('Auction created successfully:', data);
     return data;
-
   } catch (error: any) {
-    console.error('Detailed error creating auction:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      details: error
-    });
-    throw new Error(error.message || 'Failed to create auction');
+    console.error('Error creating auction:', error);
+    throw error;
   }
 }
 
 // Add this function to upload images to Supabase storage
 export async function uploadImage(file: File): Promise<string> {
   try {
+    // Generate a unique file name
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
     const filePath = `auction-images/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
+    console.log('Starting image upload:', { fileName, filePath, fileSize: file.size });
+
+    // Upload the file directly without bucket check
+    const { data, error: uploadError } = await supabase.storage
       .from('images')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type
+      });
 
     if (uploadError) {
-      throw uploadError;
+      console.error('Upload error:', uploadError.message);
+      throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
-    // Get the public URL for the uploaded image
-    const { data: { publicUrl } } = supabase.storage
+    // Get the public URL
+    const { data: urlData } = supabase.storage
       .from('images')
       .getPublicUrl(filePath);
 
-    return publicUrl;
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    throw error;
+    if (!urlData.publicUrl) {
+      throw new Error('Failed to get public URL for uploaded image');
+    }
+
+    console.log('Upload successful, public URL:', urlData.publicUrl);
+    return urlData.publicUrl;
+
+  } catch (error: any) {
+    console.error('Upload error:', error.message);
+    throw new Error(error.message || 'Failed to upload image');
   }
 } 
