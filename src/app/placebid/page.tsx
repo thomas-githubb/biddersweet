@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Timer, Eye, Heart, DollarSign, ChevronUp, ChevronDown, Share2, Bell, Info } from "lucide-react";
+import { Timer, Eye, Heart, DollarSign, ChevronUp, ChevronDown, Share2, Bell, Info, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -270,6 +270,32 @@ function generateConsistentDetails(category: string | null, itemId: string | nul
   return result;
 }
 
+// Add these functions before the component
+const handleBidAttempt = (amount: number) => {
+  if (!user) {
+    alert("Please login to place a bid");
+    return;
+  }
+  setPendingBidAmount(amount);
+  setShowConfirmation(true);
+};
+
+const handleCustomBid = () => {
+  if (!user) {
+    alert("Please login to place a bid");
+    return;
+  }
+  
+  const amount = Number(customBidAmount);
+  if (isNaN(amount) || amount <= currentBid) {
+    alert(`Please enter a valid amount higher than ${currentBid}`);
+    return;
+  }
+  
+  setPendingBidAmount(amount);
+  setShowConfirmation(true);
+};
+
 export default function AuctionItemPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -301,67 +327,9 @@ export default function AuctionItemPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState(0);
   const [supabaseChannel, setSupabaseChannel] = useState<RealtimeChannel | null>(null);
-
-  // Set up real-time connection with better error handling
-  useEffect(() => {
-    if (!itemDetails.id) {
-      console.log("No item ID provided");
-      return;
-    }
-
-    console.log("Attempting to connect to Firebase...");
-    console.log("Database instance:", database); // Check if database is initialized
-
-    try {
-      const itemRef = ref(database, `auctions/${itemDetails.id}`);
-      console.log("Created reference:", itemRef);
-      
-      // Initialize auction data if it doesn't exist
-      get(itemRef)
-        .then((snapshot) => {
-          console.log("Got snapshot:", snapshot.val());
-          if (!snapshot.exists()) {
-            console.log("No existing data, initializing...");
-            const initialData = {
-              currentBid: itemDetails.currentBid,
-              highestBidder: itemDetails.highestBidder || "Anonymous",
-              bidHistory: [{
-                bidder: itemDetails.highestBidder || "Anonymous",
-                bid: itemDetails.currentBid,
-                timestamp: new Date().toISOString()
-              }]
-            };
-            
-            return set(itemRef, initialData);
-          }
-        })
-        .then(() => {
-          console.log("Data initialized successfully");
-        })
-        .catch((error) => {
-          console.error("Firebase initialization error:", error);
-        });
-
-      // Listen for changes
-      const unsubscribe = onValue(itemRef, (snapshot) => {
-        console.log("Received update:", snapshot.val());
-        const data = snapshot.val();
-        if (data) {
-          setCurrentBid(data.currentBid);
-          setBidHistory(data.bidHistory || []);
-        }
-      }, (error) => {
-        console.error("Firebase subscription error:", error);
-      });
-
-      return () => {
-        console.log("Cleaning up Firebase connection");
-        unsubscribe();
-      };
-    } catch (error) {
-      console.error("Firebase setup error:", error);
-    }
-  }, [itemDetails.id, itemDetails.highestBidder]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBidding, setIsBidding] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
   // Check authentication state
   useEffect(() => {
@@ -370,6 +338,57 @@ export default function AuctionItemPage() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Remove or comment out the Firebase database code since we're using Supabase
+  useEffect(() => {
+    if (!itemDetails.id) {
+      console.log("No item ID provided");
+      return;
+    }
+
+    // Initial fetch of current bid and bid history
+    const fetchInitialData = async () => {
+      try {
+        const { data: auctionData, error: auctionError } = await supabase
+          .from('auctions')
+          .select('current_bid, highest_bidder')
+          .eq('id', itemDetails.id)
+          .single();
+
+        if (auctionError) {
+          console.error('Error fetching auction data:', auctionError);
+          return;
+        }
+
+        if (auctionData) {
+          setCurrentBid(auctionData.current_bid);
+        }
+
+        const { data: bidsData, error: bidsError } = await supabase
+          .from('bids')
+          .select('bidder_name, amount, created_at')
+          .eq('auction_id', itemDetails.id)
+          .order('created_at', { ascending: false });
+
+        if (bidsError) {
+          console.error('Error fetching bids:', bidsError);
+          return;
+        }
+
+        if (bidsData) {
+          setBidHistory(bidsData.map(bid => ({
+            bidder: bid.bidder_name,
+            bid: bid.amount,
+            timestamp: bid.created_at
+          })));
+        }
+      } catch (error) {
+        console.error('Error in fetchInitialData:', error);
+      }
+    };
+
+    fetchInitialData();
+  }, [itemDetails.id]);
 
   // Update the useEffect that handles real-time updates
   useEffect(() => {
@@ -432,10 +451,11 @@ export default function AuctionItemPage() {
     };
   }, [itemDetails.id]);
 
-  // Add this useEffect to fetch the current bid when component mounts or user logs in
+  // Update the fetchCurrentAuctionData in useEffect
   useEffect(() => {
     const fetchCurrentAuctionData = async () => {
       if (!itemDetails.id) return;
+      setIsLoading(true);
 
       try {
         const { data, error } = await supabase
@@ -450,23 +470,24 @@ export default function AuctionItemPage() {
         }
 
         if (data) {
-          console.log('Fetched current bid:', data.current_bid);
           setCurrentBid(data.current_bid);
-          // Update the itemDetails with the latest bid
           itemDetails.currentBid = data.current_bid;
         }
       } catch (error) {
         console.error('Error in fetchCurrentAuctionData:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchCurrentAuctionData();
-  }, [itemDetails.id, user]); // Re-run when user changes or itemDetails.id changes
+  }, [itemDetails.id, user]);
 
-  // Add this useEffect to fetch bid history when the component mounts
+  // Update the bid history fetch
   useEffect(() => {
     const fetchBidHistory = async () => {
       if (!itemDetails.id) return;
+      setIsLoadingHistory(true);
 
       try {
         const { data, error } = await supabase
@@ -490,80 +511,18 @@ export default function AuctionItemPage() {
         }
       } catch (error) {
         console.error('Error in fetchBidHistory:', error);
+      } finally {
+        setIsLoadingHistory(false);
       }
     };
 
     fetchBidHistory();
-  }, [itemDetails.id]); // Fetch when itemDetails.id changes
-
-  // Update the real-time subscription to maintain bid history
-  useEffect(() => {
-    if (!itemDetails.id) return;
-
-    console.log('Setting up real-time subscription for auction:', itemDetails.id);
-
-    const channel = supabase.channel(`public:bids:auction_id=eq.${itemDetails.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'bids',
-          filter: `auction_id=eq.${itemDetails.id}`
-        },
-        (payload) => {
-          console.log('Received new bid:', payload);
-          if (payload.new) {
-            // Add new bid to history
-            const newBid: BidHistoryItem = {
-              bidder: payload.new.bidder_name,
-              bid: payload.new.amount,
-              timestamp: payload.new.created_at
-            };
-            setBidHistory(prev => [newBid, ...prev]);
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Bid history subscription status:', status);
-      });
-
-    return () => {
-      console.log('Cleaning up bid history subscription');
-      supabase.removeChannel(channel);
-    };
   }, [itemDetails.id]);
 
-  const handleBidAttempt = (amount: number) => {
-    if (!user) {
-      // Redirect to login if not authenticated
-      router.push('/login');
-      return;
-    }
-    handleBidConfirmation(amount);
-  };
-
-  const handleCustomBid = () => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    const amount = parseInt(customBidAmount);
-    if (!isNaN(amount) && amount > currentBid) {
-      handleBidConfirmation(amount);
-    } else {
-      alert("Please enter a valid amount higher than the current bid");
-    }
-  };
-
-  const handleBidConfirmation = (amount: number) => {
-    setPendingBidAmount(amount);
-    setShowConfirmation(true);
-  };
-
+  // Update the confirmBid function
   const confirmBid = async () => {
     try {
+      setIsBidding(true);
       const auctionId = itemDetails.id ? parseInt(itemDetails.id) : null;
       
       if (!auctionId) {
@@ -618,7 +577,43 @@ export default function AuctionItemPage() {
     } catch (error: any) {
       console.error('Bid confirmation error:', error);
       alert(error.message || 'Failed to place bid. Please try again.');
+    } finally {
+      setIsBidding(false);
     }
+  };
+
+  // Add this function to handle quick bids
+  const handleQuickBid = (amount: number) => {
+    if (!user) {
+      alert("Please login to place a bid");
+      return;
+    }
+    
+    const newBidAmount = currentBid + amount;
+    setPendingBidAmount(newBidAmount);
+    setShowConfirmation(true);
+  };
+
+  // Add this function to handle custom bid input
+  const handleCustomBidChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomBidAmount(e.target.value);
+  };
+
+  // Add this function to handle custom bid submission
+  const handleCustomBidSubmit = () => {
+    if (!user) {
+      alert("Please login to place a bid");
+      return;
+    }
+
+    const amount = Number(customBidAmount);
+    if (isNaN(amount) || amount <= currentBid) {
+      alert(`Please enter a valid amount higher than ${currentBid}`);
+      return;
+    }
+
+    setPendingBidAmount(amount);
+    setShowConfirmation(true);
   };
 
   return (
@@ -713,10 +708,17 @@ export default function AuctionItemPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Current Bid</span>
-                <AnimatedPrice
-                  value={currentBid}
-                  className="text-2xl font-bold text-purple-100"
-                />
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading current bid...</span>
+                  </div>
+                ) : (
+                  <AnimatedPrice
+                    value={currentBid}
+                    className="text-2xl font-bold text-purple-100"
+                  />
+                )}
               </div>
               
               {!user ? (
@@ -735,7 +737,7 @@ export default function AuctionItemPage() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md font-medium transition-colors duration-200"
-                        onClick={() => handleBidAttempt(currentBid + amount)}
+                        onClick={() => handleQuickBid(amount)}
                       >
                         +${amount}
                       </motion.button>
@@ -746,16 +748,15 @@ export default function AuctionItemPage() {
                     <input
                       type="number"
                       value={customBidAmount}
-                      onChange={(e) => setCustomBidAmount(e.target.value)}
-                      placeholder="Enter Bid Amount"
-                      min={currentBid + 1}
-                      className="flex-1 px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
+                      onChange={handleCustomBidChange}
+                      placeholder="Enter bid amount"
+                      className="flex-1 bg-gray-800 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-md font-medium transition-colors duration-200"
-                      onClick={handleCustomBid}
+                      onClick={handleCustomBidSubmit}
                     >
                       Bid
                     </motion.button>
@@ -766,70 +767,102 @@ export default function AuctionItemPage() {
           </Card>
 
           {/* Bid Confirmation Modal */}
-          <AnimatePresence>
-            {showConfirmation && (
-              <>
-                {/* Backdrop */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-                  onClick={() => setShowConfirmation(false)}
-                />
-                
-                {/* Modal - positioned much higher */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                  className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 p-4"
-                  style={{ 
-                    transform: 'translate(-50%, calc(-50% - 40vh))',  // Much higher (from -25vh to -40vh)
-                    marginLeft: '-15vw'  // Keeping the same horizontal position
-                  }}
-                >
-                  <Card className="p-6 bg-gray-900/95 border-purple-500/20 backdrop-blur-lg shadow-xl">
-                    <h3 className="text-xl font-bold text-purple-100 mb-4">Confirm Your Bid</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Current Bid</span>
-                        <span className="text-purple-100">${currentBid.toLocaleString()}</span>
+          {showConfirmation && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="w-full max-w-md"
+              >
+                <Card className="bg-gradient-to-br from-gray-900 to-purple-900/50 border border-purple-500/20 shadow-xl">
+                  <div className="p-6">
+                    <h3 className="text-2xl font-bold text-purple-100 mb-6">Confirm Your Bid</h3>
+                    <div className="space-y-6">
+                      {/* Current Bid */}
+                      <div className="bg-black/30 rounded-lg p-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Current Bid</span>
+                          <div className="flex items-center">
+                            <DollarSign className="w-4 h-4 text-purple-400 mr-1" />
+                            <span className="text-purple-100 font-semibold">
+                              {currentBid.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Your Bid</span>
-                        <span className="text-green-400 font-bold">${pendingBidAmount.toLocaleString()}</span>
+
+                      {/* Your Bid */}
+                      <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/20">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Your Bid</span>
+                          <div className="flex items-center">
+                            <DollarSign className="w-4 h-4 text-green-400 mr-1" />
+                            <span className="text-green-400 font-bold text-lg">
+                              {pendingBidAmount.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-purple-900/50">
-                        <span className="text-gray-400">Increase Amount</span>
-                        <span className="text-green-400 font-bold">
-                          +${(pendingBidAmount - currentBid).toLocaleString()}
-                        </span>
+
+                      {/* Increase Amount */}
+                      <div className="bg-green-900/20 rounded-lg p-4 border border-green-500/20">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Increase Amount</span>
+                          <div className="flex items-center">
+                            <ChevronUp className="w-4 h-4 text-green-400 mr-1" />
+                            <span className="text-green-400 font-bold">
+                              +${(pendingBidAmount - currentBid).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex space-x-3 pt-4">
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          className="flex-1 bg-gray-800 text-gray-300 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200"
+
+                      {/* Bid Info */}
+                      <div className="bg-purple-900/20 rounded-lg p-4 text-sm text-gray-400">
+                        <div className="flex items-start space-x-2">
+                          <Info className="w-4 h-4 mt-0.5 text-purple-400" />
+                          <p>
+                            By placing this bid, you agree to our terms of service. 
+                            This bid is binding and cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex space-x-3 pt-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-purple-500/20 hover:bg-purple-900/50 text-purple-100"
                           onClick={() => setShowConfirmation(false)}
+                          disabled={isBidding}
                         >
                           Cancel
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          className="flex-1 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 transition-colors duration-200"
+                        </Button>
+                        <Button 
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
                           onClick={confirmBid}
+                          disabled={isBidding}
                         >
-                          Confirm Bid
-                        </motion.button>
+                          {isBidding ? (
+                            <div className="flex items-center justify-center">
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              <span>Placing Bid...</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center">
+                              <DollarSign className="w-4 h-4 mr-2" />
+                              <span>Place Bid</span>
+                            </div>
+                          )}
+                        </Button>
                       </div>
                     </div>
-                  </Card>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
+                  </div>
+                </Card>
+              </motion.div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="border-b border-gray-800">
@@ -917,27 +950,33 @@ export default function AuctionItemPage() {
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-2"
               >
-                {bidHistory.map((bid, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center p-3 rounded-lg bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-900/50 rounded-full flex items-center justify-center text-sm">
-                        {bid.bidder[0]}
-                      </div>
-                      <div>
-                        <div className="font-medium text-purple-100">{bid.bidder}</div>
-                        <div className="text-sm text-gray-400">
-                          {new Date(bid.timestamp).toLocaleString()}
+                {isLoadingHistory ? (
+                  <div className="flex justify-center p-4">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : (
+                  bidHistory.map((bid, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center p-3 rounded-lg bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-900/50 rounded-full flex items-center justify-center text-sm">
+                          {bid.bidder[0]}
+                        </div>
+                        <div>
+                          <div className="font-medium text-purple-100">{bid.bidder}</div>
+                          <div className="text-sm text-gray-400">
+                            {new Date(bid.timestamp).toLocaleString()}
+                          </div>
                         </div>
                       </div>
+                      <div className="text-right font-semibold text-purple-100">
+                        ${bid.bid.toLocaleString()}
+                      </div>
                     </div>
-                    <div className="text-right font-semibold text-purple-100">
-                      ${bid.bid.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </motion.div>
             )}
           </AnimatePresence>
