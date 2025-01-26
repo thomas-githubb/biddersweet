@@ -37,14 +37,15 @@ export function AnimatedPrice({ value, className }: AnimatedPriceProps) {
   return (
     <div className="relative min-h-[30px]">
       <div className={cn("flex items-center", className)}>
-        <DollarSign className="w-4 h-4 mr-1" />
+        <span className="mr-1">$</span>
         <motion.span
           key={value}
-          initial={{ opacity: 0.5, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -20, opacity: 0 }}
           className="font-bold"
         >
-          {value.toLocaleString()}
+          {value?.toLocaleString() || '0'}
         </motion.span>
       </div>
       

@@ -13,6 +13,8 @@ import { database } from "@/firebase";
 import { ref, onValue, set, get } from "firebase/database";
 import { auth } from "@/firebase";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase"; // Import Supabase client
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 // Enhanced mock data
 const auctionItem = {
@@ -45,6 +47,33 @@ const auctionItem = {
     { bidder: "s***k", bid: 2200, timestamp: "2025-01-25T11:40:00Z" },
   ],
 };
+
+// Near the top of your file, add this type
+interface ItemDetails {
+  id: string | null;
+  name: string | null;
+  currentBid: number;
+  image: string | null;
+  endTime: string | null;
+  watchers: number;
+  bids: number;
+  category: string | null;
+  highestBidder: string | null;
+}
+
+// Add this interface at the top with your other interfaces
+interface BidHistoryItem {
+  bidder: string;
+  bid: number;
+  timestamp: string;
+}
+
+// Add this type for real-time updates
+interface RealtimeUpdate {
+  current_bid: number;
+  highest_bidder: string;
+  total_bids: number;
+}
 
 // Generate a random length lorem ipsum description
 function generateDescription(itemName: string | null) {
@@ -231,19 +260,14 @@ export default function AuctionItemPage() {
 
   const [selectedImage, setSelectedImage] = useState(itemDetails.image);
   const [currentBid, setCurrentBid] = useState(itemDetails.currentBid);
-  const [bidHistory, setBidHistory] = useState([
-    { 
-      bidder: itemDetails.highestBidder || "Anonymous", 
-      bid: itemDetails.currentBid,
-      timestamp: new Date().toISOString()
-    }
-  ]);
+  const [bidHistory, setBidHistory] = useState<BidHistoryItem[]>([]);
   const [isWatching, setIsWatching] = useState(false);
   const [customBidAmount, setCustomBidAmount] = useState("");
   const [activeTab, setActiveTab] = useState("details");
   const [zoomedImage, setZoomedImage] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState(0);
+  const [supabaseChannel, setSupabaseChannel] = useState<RealtimeChannel | null>(null);
 
   // Set up real-time connection with better error handling
   useEffect(() => {
@@ -314,6 +338,98 @@ export default function AuctionItemPage() {
     return () => unsubscribe();
   }, []);
 
+  // Update the useEffect that handles real-time updates
+  useEffect(() => {
+    if (!itemDetails.id) return;
+
+    console.log('Setting up real-time subscription for auction:', itemDetails.id);
+
+    // Create a channel for this auction
+    const channel = supabase.channel(`public:auctions:id=eq.${itemDetails.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+          filter: `id=eq.${itemDetails.id}`
+        },
+        (payload) => {
+          console.log('Received auction update:', payload);
+          if (payload.new) {
+            // Update the current bid and trigger animation
+            setCurrentBid(payload.new.current_bid);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bids',
+          filter: `auction_id=eq.${itemDetails.id}`
+        },
+        (payload) => {
+          console.log('Received new bid:', payload);
+          if (payload.new) {
+            // Update bid history
+            const newBid: BidHistoryItem = {
+              bidder: payload.new.bidder_name,
+              bid: payload.new.amount,
+              timestamp: payload.new.created_at
+            };
+            setBidHistory(prev => [newBid, ...prev]);
+          }
+        }
+      );
+
+    // Subscribe to the channel
+    channel.subscribe((status) => {
+      console.log('Subscription status:', status);
+      if (status === 'SUBSCRIBED') {
+        console.log('Successfully subscribed to real-time changes');
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      console.log('Cleaning up subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [itemDetails.id]);
+
+  // Add this useEffect to fetch the current bid when component mounts or user logs in
+  useEffect(() => {
+    const fetchCurrentAuctionData = async () => {
+      if (!itemDetails.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('auctions')
+          .select('current_bid, highest_bidder')
+          .eq('id', itemDetails.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching current bid:', error);
+          return;
+        }
+
+        if (data) {
+          console.log('Fetched current bid:', data.current_bid);
+          setCurrentBid(data.current_bid);
+          // Update the itemDetails with the latest bid
+          itemDetails.currentBid = data.current_bid;
+        }
+      } catch (error) {
+        console.error('Error in fetchCurrentAuctionData:', error);
+      }
+    };
+
+    fetchCurrentAuctionData();
+  }, [itemDetails.id, user]); // Re-run when user changes or itemDetails.id changes
+
   const handleBidAttempt = (amount: number) => {
     if (!user) {
       // Redirect to login if not authenticated
@@ -342,10 +458,63 @@ export default function AuctionItemPage() {
     setShowConfirmation(true);
   };
 
-  const confirmBid = () => {
-    setCurrentBid(pendingBidAmount);
-    setShowConfirmation(false);
-    setCustomBidAmount("");
+  const confirmBid = async () => {
+    try {
+      const auctionId = itemDetails.id ? parseInt(itemDetails.id) : null;
+      
+      if (!auctionId) {
+        throw new Error(`Invalid auction ID: ${itemDetails.id}`);
+      }
+
+      // Fetch the latest bid before proceeding
+      const { data: latestData, error: fetchError } = await supabase
+        .from('auctions')
+        .select('current_bid')
+        .eq('id', auctionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const latestBid = latestData?.current_bid || 0;
+
+      if (pendingBidAmount <= latestBid) {
+        throw new Error(`Bid must be higher than current bid of $${latestBid}`);
+      }
+
+      const bidderName = user ? (user.displayName || user.email || 'Anonymous') : 'Anonymous';
+      const userId = user ? user.uid : 'anonymous-user';
+
+      // First update the auction
+      const { error: auctionError } = await supabase
+        .from('auctions')
+        .update({
+          current_bid: pendingBidAmount,
+          highest_bidder: bidderName
+        })
+        .eq('id', auctionId);
+
+      if (auctionError) throw auctionError;
+
+      // Then insert the bid
+      const { error: bidError } = await supabase
+        .from('bids')
+        .insert([{
+          auction_id: auctionId,
+          user_id: userId,
+          amount: pendingBidAmount,
+          bidder_name: bidderName
+        }]);
+
+      if (bidError) throw bidError;
+
+      setShowConfirmation(false);
+      setCustomBidAmount("");
+      alert("Bid placed successfully!");
+
+    } catch (error: any) {
+      console.error('Bid confirmation error:', error);
+      alert(error.message || 'Failed to place bid. Please try again.');
+    }
   };
 
   return (
@@ -364,8 +533,8 @@ export default function AuctionItemPage() {
               transition={{ duration: 0.3 }}
             >
               <Image
-                src={selectedImage}
-                alt={itemDetails.name}
+                src={selectedImage || '/placeholder.jpg'}
+                alt={itemDetails.name || 'Auction Item'}
                 layout="fill"
                 objectFit="cover"
                 className="transition-transform duration-300"

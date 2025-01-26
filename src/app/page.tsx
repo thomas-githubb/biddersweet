@@ -9,6 +9,8 @@ import { useState, useEffect } from "react";
 import { useCountdown } from "@/hooks/useCountdown";
 import { AnimatedPrice } from "@/components/ui/animated-price"
 import { AnimatedHeart } from "@/components/ui/animated-heart"
+import { supabase } from "@/lib/supabase";
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 // Expanded mock data for trending items
 const trendingItems = [
@@ -321,20 +323,36 @@ const auctionItems = [
   },
 ] as const;
 
+// Update the interface
+interface AuctionItem {
+  id: number;
+  name: string;
+  currentBid: number;
+  endTime: string;
+  image: string;
+  category: string;
+  bids: number;
+  watchers: number;
+  highestBidder: string;
+  isLiked: boolean;
+  prevBid: number;
+}
+
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("All Items");
   const [visibleItems, setVisibleItems] = useState(10);
-  const [auctionItemsState, setAuctionItemsState] = useState(
+  const [auctionItemsState, setAuctionItemsState] = useState<AuctionItem[]>(
     auctionItems.map(item => ({
       ...item,
       isLiked: false,
       watchers: item.watchers,
       bids: item.bids,
       currentBid: item.currentBid,
-      prevBid: item.currentBid // Add this to track previous bid
+      prevBid: item.currentBid
     }))
   );
   const [countdowns, setCountdowns] = useState<Record<number, string>>({});
+  const [channels, setChannels] = useState<RealtimeChannel[]>([]);
 
   // Filter items based on selected category
   const filteredItems = auctionItemsState.filter(item => 
@@ -362,30 +380,56 @@ export default function Home() {
     );
   };
 
-  // Update bids and watchers less frequently
+  // Update the updateAuctionPrice function
+  const updateAuctionPrice = async (auctionId: number, newPrice: number, newBidder: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('auctions')
+        .update({ 
+          current_bid: newPrice,
+          highest_bidder: newBidder,
+          total_bids: supabase.rpc('increment_bids')
+        })
+        .eq('id', auctionId)
+        .select();
+
+      if (error) {
+        console.error('Error updating auction price:', error.message);
+        return null;
+      }
+      return data;
+    } catch (error) {
+      console.error('Failed to update auction price:', error);
+      return null;
+    }
+  };
+
+  // Update the useEffect that handles price updates
   useEffect(() => {
     const interval = setInterval(() => {
-      setAuctionItemsState(currentItems =>
+      setAuctionItemsState(currentItems => 
         currentItems.map(item => {
-          const newWatchers = item.watchers + (Math.random() > 0.7 ? 1 : 0);
-          const shouldIncreaseBid = Math.random() > 0.97; // Reduced from 0.92 to 0.97 (less frequent updates)
-          const bidIncrement = Math.floor(item.currentBid * (0.02 + Math.random() * 0.03)); // Increased increment amount
-          
-          return shouldIncreaseBid ? {
-            ...item,
-            watchers: newWatchers,
-            prevBid: item.currentBid,
-            currentBid: item.currentBid + bidIncrement,
-            bids: item.bids + 1,
-            highestBidder: ['a***x', 'b***y', 'c***z', 'd***w'][Math.floor(Math.random() * 4)]
-          } : {
-            ...item,
-            watchers: newWatchers,
-            prevBid: item.currentBid
-          };
+          const shouldIncreaseBid = Math.random() > 0.97;
+          if (shouldIncreaseBid) {
+            const newBid = item.currentBid + Math.floor(item.currentBid * (0.02 + Math.random() * 0.03));
+            const newBidder = ['a***x', 'b***y', 'c***z', 'd***w'][Math.floor(Math.random() * 4)];
+            
+            // Update the auction in Supabase
+            void updateAuctionPrice(item.id, newBid, newBidder);
+            
+            return {
+              ...item,
+              watchers: item.watchers + (Math.random() > 0.7 ? 1 : 0),
+              prevBid: item.currentBid,
+              currentBid: newBid,
+              bids: item.bids + 1,
+              highestBidder: newBidder
+            } as AuctionItem;
+          }
+          return item;
         })
       );
-    }, 3000); // Changed from 1500 to 3000 (less frequent updates)
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
@@ -407,6 +451,89 @@ export default function Home() {
       Object.values(timeouts).forEach(timeout => clearTimeout(timeout));
     };
   }, [filteredItems]); // Only re-run when filtered items change
+
+  // Subscribe to real-time updates for all auction items
+  useEffect(() => {
+    // Clean up existing channels
+    channels.forEach(channel => supabase.removeChannel(channel));
+
+    // Create a new channel for each auction item
+    const newChannels = auctionItemsState.map(item => {
+      const channel = supabase
+        .channel(`public:auctions:id=eq.${item.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'auctions',
+            filter: `id=eq.${item.id}`
+          },
+          (payload) => {
+            console.log('Received update for auction:', payload);
+            if (payload.new) {
+              setAuctionItemsState(currentItems =>
+                currentItems.map(currentItem =>
+                  currentItem.id === item.id
+                    ? {
+                        ...currentItem,
+                        prevBid: currentItem.currentBid,
+                        currentBid: payload.new.current_bid,
+                        highestBidder: payload.new.highest_bidder,
+                        bids: payload.new.total_bids || currentItem.bids
+                      }
+                    : currentItem
+                )
+              );
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log(`Subscription status for auction ${item.id}:`, status);
+        });
+
+      return channel;
+    });
+
+    setChannels(newChannels);
+
+    // Cleanup function
+    return () => {
+      console.log('Cleaning up subscription channels');
+      newChannels.forEach(channel => supabase.removeChannel(channel));
+    };
+  }, []); // Empty dependency array as we only want to set this up once
+
+  // Initial fetch of auction data
+  useEffect(() => {
+    const fetchAuctionData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('auctions')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching auction data:', error);
+          return;
+        }
+
+        if (data) {
+          setAuctionItemsState(data.map(auction => ({
+            ...auction,
+            isLiked: false,
+            prevBid: auction.current_bid,
+            watchers: auction.watchers || 0,
+            bids: auction.total_bids || 0
+          })));
+        }
+      } catch (error) {
+        console.error('Error in fetchAuctionData:', error);
+      }
+    };
+
+    fetchAuctionData();
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4">
@@ -458,9 +585,9 @@ export default function Home() {
 
         {/* Auction Grid - Now with visible items limit */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.slice(0, visibleItems).map((item) => (
+          {filteredItems.slice(0, visibleItems).map((item: AuctionItem) => (
             <Card 
-              key={item.id} 
+              key={`auction-${item.id}`} 
               className="overflow-hidden hover:shadow-lg transition-all duration-300 bg-gray-900/50 border-purple-900/20"
             >
               <div className="p-4">
