@@ -529,6 +529,10 @@ export default function AuctionItemPage() {
         throw new Error(`Invalid auction ID: ${itemDetails.id}`);
       }
 
+      if (!user) {
+        throw new Error('Please login to place a bid');
+      }
+
       // Fetch the latest bid before proceeding
       const { data: latestData, error: fetchError } = await supabase
         .from('auctions')
@@ -544,31 +548,41 @@ export default function AuctionItemPage() {
         throw new Error(`Bid must be higher than current bid of $${latestBid}`);
       }
 
-      const bidderName = user ? (user.displayName || user.email || 'Anonymous') : 'Anonymous';
-      const userId = user ? user.uid : 'anonymous-user';
+      // Get the actual username from Firebase auth
+      const bidderName = user.displayName || user.email?.split('@')[0] || 'Anonymous';
 
-      // First update the auction
+      // First insert the bid
+      const { error: bidError } = await supabase
+        .from('bids')
+        .insert({
+          auction_id: auctionId,
+          user_id: user.uid,
+          amount: pendingBidAmount,
+          bidder_name: bidderName,
+          created_at: new Date().toISOString() // Add timestamp
+        });
+
+      if (bidError) throw bidError;
+
+      // Then update the auction with the same bidder name
       const { error: auctionError } = await supabase
         .from('auctions')
         .update({
           current_bid: pendingBidAmount,
-          highest_bidder: bidderName
+          highest_bidder: bidderName,
+          last_bid_at: new Date().toISOString() // Add timestamp
         })
         .eq('id', auctionId);
 
       if (auctionError) throw auctionError;
 
-      // Then insert the bid
-      const { error: bidError } = await supabase
-        .from('bids')
-        .insert([{
-          auction_id: auctionId,
-          user_id: userId,
-          amount: pendingBidAmount,
-          bidder_name: bidderName
-        }]);
-
-      if (bidError) throw bidError;
+      // Update local state
+      setCurrentBid(pendingBidAmount);
+      setBidHistory(prev => [{
+        bidder: bidderName,
+        bid: pendingBidAmount,
+        timestamp: new Date().toISOString()
+      }, ...prev]);
 
       setShowConfirmation(false);
       setCustomBidAmount("");
