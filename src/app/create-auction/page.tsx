@@ -30,32 +30,32 @@ export default function CreateAuctionPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length + images.length <= 5) {
-      const newImages = Array.from(files).map(file => ({
+      const newImages = Array.from(files).map((file) => ({
         url: URL.createObjectURL(file),
-        file
+        file,
       }));
-      setImages(prev => [...prev, ...newImages]);
+      setImages((prev) => [...prev, ...newImages]);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = e.dataTransfer.files;
     if (files && files.length + images.length <= 5) {
       const newImages = Array.from(files)
-        .filter(file => file.type.startsWith('image/'))
-        .map(file => ({
+        .filter((file) => file.type.startsWith("image/"))
+        .map((file) => ({
           url: URL.createObjectURL(file),
-          file
+          file,
         }));
-      setImages(prev => [...prev, ...newImages]);
+      setImages((prev) => [...prev, ...newImages]);
     }
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,33 +64,47 @@ export default function CreateAuctionPage() {
   };
 
   const categories = [
-    "Art", "Collectibles", "Electronics", "Fashion", 
-    "Jewelry", "Sports", "Antiques", "Luxury"
+    "Art",
+    "Collectibles",
+    "Electronics",
+    "Fashion",
+    "Jewelry",
+    "Sports",
+    "Antiques",
+    "Luxury",
   ];
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-purple-100">Create New Auction</h1>
-        <Button 
+        <h1 className="text-3xl font-bold text-purple-100">
+          Create New Auction
+        </h1>
+        <Button
           onClick={() => setShowPreview(true)}
           className="bg-purple-600 hover:bg-purple-700"
         >
           Preview Listing
         </Button>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Image Upload Section */}
         <Card className="p-6 bg-gray-900/50 border-purple-900/20">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-purple-100">Item Images</h2>
-            <span className="text-sm text-gray-400">{images.length}/5 images</span>
+            <h2 className="text-xl font-semibold text-purple-100">
+              Item Images
+            </h2>
+            <span className="text-sm text-gray-400">
+              {images.length}/5 images
+            </span>
           </div>
-          
+
           <div
             className={`relative border-2 border-dashed rounded-lg p-8 text-center ${
-              isDragging ? "border-purple-500 bg-purple-500/10" : "border-purple-900"
+              isDragging
+                ? "border-purple-500 bg-purple-500/10"
+                : "border-purple-900"
             }`}
             onDragOver={(e) => {
               e.preventDefault();
@@ -110,11 +124,17 @@ export default function CreateAuctionPage() {
             />
             <label
               htmlFor="image-upload"
-              className={`cursor-pointer flex flex-col items-center ${images.length >= 5 ? 'opacity-50' : ''}`}
+              className={`cursor-pointer flex flex-col items-center ${
+                images.length >= 5 ? "opacity-50" : ""
+              }`}
             >
               <Camera className="w-12 h-12 text-purple-400 mb-2" />
-              <span className="text-purple-100">Drag & drop images or click to upload</span>
-              <span className="text-gray-400 text-sm mt-1">Up to 5 high-quality images</span>
+              <span className="text-purple-100">
+                Drag & drop images or click to upload
+              </span>
+              <span className="text-gray-400 text-sm mt-1">
+                Up to 5 high-quality images
+              </span>
             </label>
           </div>
 
@@ -151,8 +171,10 @@ export default function CreateAuctionPage() {
 
         {/* Item Details */}
         <Card className="p-6 bg-gray-900/50 border-purple-900/20">
-          <h2 className="text-xl font-semibold text-purple-100 mb-4">Item Details</h2>
-          
+          <h2 className="text-xl font-semibold text-purple-100 mb-4">
+            Item Details
+          </h2>
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-purple-100 mb-1">
@@ -161,7 +183,9 @@ export default function CreateAuctionPage() {
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
                 className="w-full px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="Give your item a catchy title"
                 required
@@ -174,7 +198,12 @@ export default function CreateAuctionPage() {
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 className="w-full px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 h-32"
                 placeholder="Describe your item in detail - condition, history, unique features..."
                 required
@@ -188,12 +217,19 @@ export default function CreateAuctionPage() {
                 </label>
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      category: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   required
                 >
                   {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -204,13 +240,22 @@ export default function CreateAuctionPage() {
                 </label>
                 <select
                   value={formData.condition}
-                  onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      condition: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   required
                 >
-                  {["New", "Like New", "Excellent", "Good", "Fair"].map((condition) => (
-                    <option key={condition} value={condition}>{condition}</option>
-                  ))}
+                  {["New", "Like New", "Excellent", "Good", "Fair"].map(
+                    (condition) => (
+                      <option key={condition} value={condition}>
+                        {condition}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
             </div>
@@ -225,7 +270,12 @@ export default function CreateAuctionPage() {
                   <input
                     type="number"
                     value={formData.startingBid}
-                    onChange={(e) => setFormData(prev => ({ ...prev, startingBid: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        startingBid: e.target.value,
+                      }))
+                    }
                     className="w-full pl-10 pr-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="0.00"
                     required
@@ -242,7 +292,12 @@ export default function CreateAuctionPage() {
                   <Timer className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <select
                     value={formData.duration}
-                    onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        duration: e.target.value,
+                      }))
+                    }
                     className="w-full pl-10 pr-3 py-2 bg-gray-800 border border-purple-900 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     required
                   >
@@ -304,7 +359,9 @@ export default function CreateAuctionPage() {
             >
               <Card className="p-6 bg-gray-900/95 border-purple-500/20 backdrop-blur-lg shadow-xl">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-purple-100">Preview Listing</h3>
+                  <h3 className="text-xl font-bold text-purple-100">
+                    Preview Listing
+                  </h3>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -313,7 +370,7 @@ export default function CreateAuctionPage() {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                
+
                 {/* Preview Content */}
                 <div className="space-y-4">
                   {images.length > 0 && (
@@ -326,9 +383,11 @@ export default function CreateAuctionPage() {
                       />
                     </div>
                   )}
-                  
+
                   <div>
-                    <h4 className="text-lg font-semibold text-purple-100">{formData.title}</h4>
+                    <h4 className="text-lg font-semibold text-purple-100">
+                      {formData.title}
+                    </h4>
                     <p className="text-gray-400 mt-2">{formData.description}</p>
                   </div>
 
@@ -374,4 +433,4 @@ export default function CreateAuctionPage() {
       </AnimatePresence>
     </div>
   );
-} 
+}
