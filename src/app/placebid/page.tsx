@@ -151,20 +151,53 @@ function generateItemDetails(category: string | null) {
   return details[category || ""] || defaultCategory;
 }
 
-// Generate random seller info
-function generateSellerInfo() {
-  const names = ["VintageFinds", "LuxuryTrader", "CollectiblesHub", "ArtisanDealer", "PremiumSeller"];
-  const ratings = [4.9, 4.8, 4.7, 4.95, 5.0];
-  const salesCounts = [156, 234, 89, 445, 178];
-  const years = ["2020", "2021", "2022", "2023"];
+// Add this at the top with your other functions
+function generateSellerInfo(itemId: string | null) {
+  // Fixed seller information based on item ID ranges
+  if (!itemId) return defaultSellerInfo;
 
-  return {
-    name: names[Math.floor(Math.random() * names.length)],
-    rating: ratings[Math.floor(Math.random() * ratings.length)],
-    sales: salesCounts[Math.floor(Math.random() * salesCounts.length)],
-    joined: years[Math.floor(Math.random() * years.length)],
+  const id = parseInt(itemId);
+  
+  const sellers = {
+    VintageFinds: {
+      name: "VintageFinds",
+      rating: 4.9,
+      sales: 156,
+      joined: "2022"
+    },
+    RareBooks: {
+      name: "RareBooks",
+      rating: 4.8,
+      sales: 89,
+      joined: "2021"
+    },
+    LuxuryWatches: {
+      name: "LuxuryWatches",
+      rating: 5.0,
+      sales: 234,
+      joined: "2020"
+    },
+    ArtCollector: {
+      name: "ArtCollector",
+      rating: 4.7,
+      sales: 178,
+      joined: "2023"
+    }
   };
+
+  // Deterministically assign sellers based on ID
+  if (id <= 5) return sellers.VintageFinds;
+  if (id <= 10) return sellers.RareBooks;
+  if (id <= 15) return sellers.LuxuryWatches;
+  return sellers.ArtCollector;
 }
+
+const defaultSellerInfo = {
+  name: "VintageFinds",
+  rating: 4.9,
+  sales: 156,
+  joined: "2022"
+};
 
 // Generate details once based on category and keep them consistent
 function generateConsistentDetails(category: string | null, itemId: string | null) {
@@ -255,7 +288,7 @@ export default function AuctionItemPage() {
     highestBidder: searchParams.get('highestBidder'),
     description: generateDescription(searchParams.get('name')),
     details: generateConsistentDetails(searchParams.get('category'), searchParams.get('id')),
-    seller: generateSellerInfo()
+    seller: generateSellerInfo(searchParams.get('id'))
   };
 
   const [selectedImage, setSelectedImage] = useState(itemDetails.image);
@@ -429,6 +462,77 @@ export default function AuctionItemPage() {
 
     fetchCurrentAuctionData();
   }, [itemDetails.id, user]); // Re-run when user changes or itemDetails.id changes
+
+  // Add this useEffect to fetch bid history when the component mounts
+  useEffect(() => {
+    const fetchBidHistory = async () => {
+      if (!itemDetails.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('bids')
+          .select('bidder_name, amount, created_at')
+          .eq('auction_id', itemDetails.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching bid history:', error);
+          return;
+        }
+
+        if (data) {
+          const formattedHistory: BidHistoryItem[] = data.map(bid => ({
+            bidder: bid.bidder_name,
+            bid: bid.amount,
+            timestamp: bid.created_at
+          }));
+          setBidHistory(formattedHistory);
+        }
+      } catch (error) {
+        console.error('Error in fetchBidHistory:', error);
+      }
+    };
+
+    fetchBidHistory();
+  }, [itemDetails.id]); // Fetch when itemDetails.id changes
+
+  // Update the real-time subscription to maintain bid history
+  useEffect(() => {
+    if (!itemDetails.id) return;
+
+    console.log('Setting up real-time subscription for auction:', itemDetails.id);
+
+    const channel = supabase.channel(`public:bids:auction_id=eq.${itemDetails.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bids',
+          filter: `auction_id=eq.${itemDetails.id}`
+        },
+        (payload) => {
+          console.log('Received new bid:', payload);
+          if (payload.new) {
+            // Add new bid to history
+            const newBid: BidHistoryItem = {
+              bidder: payload.new.bidder_name,
+              bid: payload.new.amount,
+              timestamp: payload.new.created_at
+            };
+            setBidHistory(prev => [newBid, ...prev]);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Bid history subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up bid history subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [itemDetails.id]);
 
   const handleBidAttempt = (amount: number) => {
     if (!user) {
