@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Camera, DollarSign, Timer, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { createNewAuction, uploadImage } from "@/lib/supabase";
+import { auth } from "@/firebase";
 
 interface ImagePreview {
   url: string;
@@ -32,6 +34,19 @@ export default function CreateAuctionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        router.push('/login');
+        toast.error("Please login to create an auction", {
+          position: "bottom-right",
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -66,21 +81,45 @@ export default function CreateAuctionPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!auth.currentUser) {
+      toast.error("Please login to create an auction");
+      router.push('/login');
+      return;
+    }
+
+    if (!formData.title || !formData.description || !formData.startingBid) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate API submission
-    setTimeout(() => {
-      // Show success toast
-      toast.success("Auction created successfully!", {
-        position: "bottom-right",
-        autoClose: 2000,
+    try {
+      console.log('Starting auction creation with form data:', formData);
+
+      // Create the auction with basic data first
+      const result = await createNewAuction({
+        title: formData.title,
+        description: formData.description,
+        starting_bid: parseFloat(formData.startingBid),
+        duration: formData.duration,
+        category: formData.category,
+        condition: formData.condition,
+        dimensions: formData.dimensions,
+        material: formData.material,
+        image_url: '/placeholder.jpg' // Start with placeholder
       });
 
-      // Redirect after the toast duration
-      setTimeout(() => {
-        router.push("/"); // Redirect to the homepage
-      }, 2000); // Ensure the loading state persists until redirect
-    }, 2000); // Simulated delay for API call
+      console.log('Auction created successfully:', result);
+      toast.success("Auction created successfully!");
+      router.push("/");
+    } catch (error: any) {
+      console.error('Error in handleSubmit:', error);
+      toast.error(error.message || "Failed to create auction");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const categories = [
