@@ -52,6 +52,10 @@ export default function SignUp() {
 
       // Redirect to home
       router.push("/");
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 500); // Adjust the timeout if necessary
     } catch (err: any) {
       toast.error(err.message, { position: "bottom-right" });
     }
@@ -62,7 +66,7 @@ export default function SignUp() {
       <div className="absolute inset-0 bg-stars bg-cover opacity-20"></div>
       <Card className="relative w-full max-w-md p-6 bg-gray-900/70 border border-purple-300 shadow-xl">
         <h2 className="text-3xl font-bold text-center text-purple-200 mb-6">
-          Join BidderSweet
+          Join BidderSuite
         </h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

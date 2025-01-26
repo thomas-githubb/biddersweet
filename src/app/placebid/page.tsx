@@ -810,7 +810,6 @@ export default function AuctionItemPage() {
         .update({
           current_bid: pendingBidAmount,
           highest_bidder: bidderName,
-          last_bid_at: new Date().toISOString(), // Add timestamp
         })
         .eq("id", auctionId);
 
@@ -829,7 +828,6 @@ export default function AuctionItemPage() {
 
       setShowConfirmation(false);
       setCustomBidAmount("");
-      alert("Bid placed successfully!");
     } catch (error: any) {
       console.error("Bid confirmation error:", error);
       alert(error.message || "Failed to place bid. Please try again.");

@@ -34,7 +34,7 @@ export default function Login() {
       <div className="absolute inset-0 bg-stars bg-cover opacity-20"></div>
       <Card className="relative w-full max-w-md p-6 bg-gray-900/70 border border-purple-300 shadow-xl">
         <h2 className="text-3xl font-bold text-center text-purple-200 mb-6">
-          Welcome Back to BidderSweet
+          Welcome Back to BidderSuite
         </h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

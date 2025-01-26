@@ -48,7 +48,7 @@ export default function RootLayout({
                 href="/"
                 className="text-xl font-bold text-primary hover:text-primary/90 transition-colors"
               >
-                BidderSweet
+                BidderSuite
               </Link>
               <div className="relative">
                 <input
@@ -59,7 +59,7 @@ export default function RootLayout({
               </div>
             </div>
             <div className="flex items-center space-x-6">
-              <Button 
+              <Button
                 className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
                 asChild
               >
